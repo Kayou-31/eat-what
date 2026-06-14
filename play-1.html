@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>猜词挑战 - 多维相似度</title>
+    <!-- 拼音库 -->
+    <script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3.22.1/dist/index.js">
+    </script>
+    <style>
+        :root {
+            --bg: #0b0b0f;
+            --card: #13131a;
+            --surface: #1a1a24;
+            --surface2: #1f1f2c;
+            --border: #222230;
+            --border-active: #333348;
+            --text: #e4e2f0;
+            --text-secondary: #8e8ca0;
+            --text-muted: #5c5a6e;
+            --accent: #7c6ff7;
+            --accent-glow: rgba(124, 111, 247, 0.3);
+            --red: #f76c6c;
+            --orange: #f7a06c;
+            --yellow: #f7d06c;
+            --green: #6cf78c;
+            --teal: #6cf7d0;
+            --blue: #6ca0f7;
+            --pink: #f76cc0;
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 10px;
+            --shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
+            --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse at 30% 0%, rgba(124, 111, 247, 0.07) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 100%, rgba(108, 247, 140, 0.04) 0%, transparent 50%),
+                radial-gradient(ellipse at 10% 80%, rgba(247, 108, 192, 0.03) 0%, transparent 40%);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            color: var(--text);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card);
+            border-radius: var(--radius-lg);
+            padding: 32px 22px 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .header {
+            text-align: center;
+        }
+        .title {
+            font-size: clamp(1.6rem, 5.8vw, 2rem);
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            background: linear-gradient(135deg, #7c6ff7, #a78bfa, #6ca0f7, #7c6ff7);
+            background-size: 300% 300%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: gradientShift 5s ease-in-out infinite;
+        }
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.06em;
+            margin-top: 2px;
+        }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .chances {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.04em;
+        }
+        .chances strong {
+            color: #fff;
+            font-size: 1.15rem;
+            min-width: 22px;
+            text-align: center;
+        }
+        .chances-bar {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--surface2);
+            overflow: hidden;
+            min-width: 60px;
+        }
+        .chances-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--accent);
+            transition: width 0.4s;
+        }
+        .btn-giveup {
+            font-size: 0.78rem;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            letter-spacing: 0.04em;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+        .btn-giveup:hover {
+            border-color: var(--red);
+            color: var(--red);
+            background: rgba(247, 108, 108, 0.06);
+        }
+        .btn-giveup:active {
+            transform: scale(0.95);
+        }
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+        .input-row input {
+            flex: 1;
+            padding: 14px 16px;
+            font-size: 1.05rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--surface);
+            color: var(--text);
+            outline: none;
+            transition: var(--transition);
+            font-family: inherit;
+            min-width: 0;
+        }
+        .input-row input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-glow);
+            background: var(--surface2);
+        }
+        .input-row input::placeholder {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        .btn-guess {
+            flex-shrink: 0;
+            padding: 14px 22px;
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            border: none;
+            border-radius: var(--radius-md);
+            background: var(--accent);
+            color: #fff;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: 0 4px 20px rgba(124, 111, 247, 0.3);
+            white-space: nowrap;
+        }
+        .btn-guess:hover {
+            background: #8b7df7;
+            box-shadow: 0 6px 28px rgba(124, 111, 247, 0.45);
+            transform: translateY(-1px);
+        }
+        .btn-guess:active {
+            transform: scale(0.94);
+            transition: transform 0.08s;
+        }
+        .btn-guess:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .result-card {
+            background: var(--surface);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px 16px 14px;
+            transition: var(--transition);
+            opacity: 0;
+            transform: translateY(12px);
+            pointer-events: none;
+        }
+        .result-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        .result-card .guess-word {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-align: center;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+        .result-card .dimensions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .dim-item {
+            text-align: center;
+            background: var(--surface2);
+            border-radius: var(--radius-sm);
+            padding: 10px 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .dim-label {
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .dim-value {
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+        .dim-value.color-red { color: var(--red); }
+        .dim-value.color-orange { color: var(--orange); }
+        .dim-value.color-yellow { color: var(--yellow); }
+        .dim-value.color-green { color: var(--green); }
+        .dim-value.color-teal { color: var(--teal); }
+        .dim-value.color-blue { color: var(--blue); }
+        .dim-value.color-pink { color: var(--pink); }
+        .dim-value.color-white { color: #fff; }
+
+        .total-bar-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .total-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+        .total-bar {
+            flex: 1;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--surface2);
+            overflow: hidden;
+        }
+        .total-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #f76c6c, #f7d06c, #6cf78c);
+            transition: width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1.2);
+        }
+        .total-percent {
+            font-size: 1.1rem;
+            font-weight: 800;
+            min-width: 44px;
+            text-align: right;
+        }
+        .history {
+            max-height: 28vh;
+            max-height: 28dvh;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            padding-right: 4px;
+        }
+        .history::-webkit-scrollbar {
+            width: 4px;
+        }
+        .history::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .history::-webkit-scrollbar-thumb {
+            background: #2a2a38;
+            border-radius: 3px;
+        }
+        .history-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--surface);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            letter-spacing: 0.03em;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: var(--transition);
+            animation: slideUp 0.28s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        .history-item:hover {
+            border-color: var(--border-active);
+            background: var(--surface2);
+        }
+        .history-index {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            min-width: 18px;
+            text-align: center;
+        }
+        .history-word {
+            flex: 1;
+            font-weight: 600;
+            color: #ddd;
+        }
+        .history-score {
+            font-weight: 700;
+            font-size: 0.9rem;
+            min-width: 38px;
+            text-align: right;
+        }
+        .history-score.high { color: var(--green); }
+        .history-score.mid { color: var(--yellow); }
+        .history-score.low { color: var(--red); }
+        .history-empty {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            padding: 16px;
+            letter-spacing: 0.04em;
+        }
+        @keyframes slideUp {
+            0% { opacity: 0; transform: translateY(10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 弹窗 */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            padding: 20px;
+            animation: fadeIn 0.25s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px 22px 22px;
+            text-align: center;
+            max-width: 360px;
+            width: 100%;
+            box-shadow: var(--shadow);
+        }
+        .modal-icon {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+        }
+        .modal-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            letter-spacing: 0.04em;
+        }
+        .modal-text {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 18px;
+            letter-spacing: 0.03em;
+        }
+        .modal-btn {
+            display: inline-block;
+            padding: 11px 32px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            background: var(--accent);
+            color: #fff;
+            transition: var(--transition);
+            box-shadow: 0 4px 16px rgba(124, 111, 247, 0.3);
+        }
+        .modal-btn:hover {
+            background: #8b7df7;
+        }
+        .modal-btn:active {
+            transform: scale(0.94);
+        }
+
+        /* 响应式 */
+        @media (max-width: 380px) {
+            .container {
+                padding: 22px 14px 18px;
+                border-radius: 18px;
+                gap: 14px;
+            }
+            .input-row input {
+                padding: 12px 12px;
+                font-size: 0.95rem;
+            }
+            .btn-guess {
+                padding: 12px 16px;
+                font-size: 0.9rem;
+            }
+            .dimensions {
+                gap: 4px;
+            }
+            .dim-item {
+                padding: 8px 4px;
+            }
+            .dim-value {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">🎯 猜词挑战</div>
+            <div class="subtitle">含义 · 字形 · 拼音 — 多维匹配</div>
+        </div>
+        <div class="status-bar">
+            <div class="chances">
+                剩余 <strong id="chancesLeft">30</strong> 次
+            </div>
+            <div class="chances-bar">
+                <div class="chances-bar-fill" id="chancesBarFill" style="width:100%"></div>
+            </div>
+            <button class="btn-giveup" id="btnGiveUp">放弃</button>
+        </div>
+        <div class="input-row">
+            <input type="text" id="guessInput" placeholder="输入你的猜测..." maxlength="10" autocomplete="off">
+            <button class="btn-guess" id="btnGuess">猜</button>
+        </div>
+        <div class="result-card" id="resultCard">
+            <div class="guess-word" id="resultWord"></div>
+            <div class="dimensions">
+                <div class="dim-item">
+                    <span class="dim-label">📖 含义</span>
+                    <span class="dim-value" id="dimMeaning">—</span>
+                </div>
+                <div class="dim-item">
+                    <span class="dim-label">✍️ 字形</span>
+                    <span class="dim-value" id="dimGlyph">—</span>
+                </div>
+                <div class="dim-item">
+                    <span class="dim-label">🔊 拼音</span>
+                    <span class="dim-value" id="dimPinyin">—</span>
+                </div>
+            </div>
+            <div class="total-bar-wrapper">
+                <span class="total-label">综合匹配</span>
+                <div class="total-bar">
+                    <div class="total-bar-fill" id="totalBarFill" style="width:0%"></div>
+                </div>
+                <span class="total-percent" id="totalPercent">0%</span>
+            </div>
+        </div>
+        <div class="history" id="historyList">
+            <div class="history-empty" id="historyEmpty">还没有猜测记录，开始猜吧 👇</div>
+        </div>
+    </div>
+    <div id="modalContainer"></div>
+
+    <script>
+        (function () {
+            // ==================== 词库 ====================
+            const wordBank = [
+                { word: '苹果', tags: ['食物', '植物', '红色'] },
+                { word: '香蕉', tags: ['食物', '植物', '黄色'] },
+                { word: '西瓜', tags: ['食物', '植物', '绿色'] },
+                { word: '草莓', tags: ['食物', '植物', '红色'] },
+                { word: '葡萄', tags: ['食物', '植物', '紫色'] },
+                { word: '菠萝', tags: ['食物', '植物', '黄色'] },
+                { word: '芒果', tags: ['食物', '植物', '黄色'] },
+                { word: '桃子', tags: ['食物', '植物', '粉色'] },
+                { word: '柠檬', tags: ['食物', '植物', '黄色'] },
+                { word: '樱桃', tags: ['食物', '植物', '红色'] },
+                { word: '面包', tags: ['食物'] },
+                { word: '蛋糕', tags: ['食物', '甜点'] },
+                { word: '面条', tags: ['食物'] },
+                { word: '米饭', tags: ['食物'] },
+                { word: '饺子', tags: ['食物'] },
+                { word: '包子', tags: ['食物'] },
+                { word: '火锅', tags: ['食物', '热'] },
+                { word: '烧烤', tags: ['食物', '热'] },
+                { word: '披萨', tags: ['食物', '西餐'] },
+                { word: '汉堡', tags: ['食物', '西餐'] },
+                { word: '咖啡', tags: ['饮料', '黑色'] },
+                { word: '奶茶', tags: ['饮料', '甜点'] },
+                { word: '可乐', tags: ['饮料', '黑色'] },
+                { word: '啤酒', tags: ['饮料', '黄色'] },
+                { word: '牛奶', tags: ['饮料', '白色'] },
+                { word: '小猫', tags: ['动物', '宠物'] },
+                { word: '小狗', tags: ['动物', '宠物'] },
+                { word: '兔子', tags: ['动物', '宠物', '白色'] },
+                { word: '老虎', tags: ['动物', '猛兽', '黄色'] },
+                { word: '狮子', tags: ['动物', '猛兽', '黄色'] },
+                { word: '大象', tags: ['动物', '灰色'] },
+                { word: '猴子', tags: ['动物'] },
+                { word: '熊猫', tags: ['动物', '黑白'] },
+                { word: '鲸鱼', tags: ['动物', '海洋', '蓝色'] },
+                { word: '海豚', tags: ['动物', '海洋', '蓝色'] },
+                { word: '小鸟', tags: ['动物', '天空'] },
+                { word: '蝴蝶', tags: ['动物', '昆虫'] },
+                { word: '蜜蜂', tags: ['动物', '昆虫', '黄色'] },
+                { word: '蚂蚁', tags: ['动物', '昆虫', '黑色'] },
+                { word: '蜘蛛', tags: ['动物', '昆虫', '黑色'] },
+                { word: '大树', tags: ['植物', '绿色'] },
+                { word: '红玫瑰', tags: ['植物', '红色', '花'] },
+                { word: '向日葵', tags: ['植物', '黄色', '花'] },
+                { word: '仙人掌', tags: ['植物', '绿色'] },
+                { word: '竹子', tags: ['植物', '绿色'] },
+                { word: '荷花', tags: ['植物', '粉色', '花'] },
+                { word: '雪山', tags: ['自然', '白色', '高'] },
+                { word: '海洋', tags: ['自然', '蓝色', '水'] },
+                { word: '沙漠', tags: ['自然', '黄色', '热'] },
+                { word: '火焰', tags: ['自然', '红色', '热'] },
+                { word: '闪电', tags: ['自然', '天空', '光'] },
+                { word: '彩虹', tags: ['自然', '天空', '彩色'] },
+                { word: '星星', tags: ['自然', '天空', '光'] },
+                { word: '月亮', tags: ['自然', '天空', '白色'] },
+                { word: '太阳', tags: ['自然', '天空', '红色'] },
+                { word: '白云', tags: ['自然', '天空', '白色'] },
+                { word: '汽车', tags: ['交通', '工具'] },
+                { word: '火车', tags: ['交通', '工具'] },
+                { word: '飞机', tags: ['交通', '天空', '工具'] },
+                { word: '轮船', tags: ['交通', '海洋', '工具'] },
+                { word: '自行车', tags: ['交通', '工具'] },
+                { word: '地铁', tags: ['交通', '工具'] },
+                { word: '学校', tags: ['建筑', '社会'] },
+                { word: '医院', tags: ['建筑', '社会'] },
+                { word: '图书馆', tags: ['建筑', '文化'] },
+                { word: '电影院', tags: ['建筑', '娱乐'] },
+                { word: '超市', tags: ['建筑', '商业'] },
+                { word: '教堂', tags: ['建筑', '宗教'] },
+                { word: '桥梁', tags: ['建筑', '交通'] },
+                { word: '城堡', tags: ['建筑', '历史'] },
+                { word: '手机', tags: ['物品', '科技'] },
+                { word: '电脑', tags: ['物品', '科技'] },
+                { word: '书本', tags: ['物品', '文化'] },
+                { word: '钢笔', tags: ['物品', '书写'] },
+                { word: '相机', tags: ['物品', '科技'] },
+                { word: '镜子', tags: ['物品', '玻璃'] },
+                { word: '时钟', tags: ['物品', '时间'] },
+                { word: '雨伞', tags: ['物品', '雨'] },
+                { word: '眼镜', tags: ['物品', '玻璃'] },
+                { word: '钥匙', tags: ['物品', '金属'] },
+                { word: '钻石', tags: ['物品', '珍贵', '透明'] },
+                { word: '爱情', tags: ['情感', '抽象'] },
+                { word: '友谊', tags: ['情感', '抽象'] },
+                { word: '快乐', tags: ['情感'] },
+                { word: '悲伤', tags: ['情感'] },
+                { word: '愤怒', tags: ['情感', '红色'] },
+                { word: '恐惧', tags: ['情感', '黑色'] },
+                { word: '勇气', tags: ['抽象', '情感'] },
+                { word: '智慧', tags: ['抽象'] },
+                { word: '自由', tags: ['抽象', '天空'] },
+                { word: '梦想', tags: ['抽象', '天空'] },
+                { word: '和平', tags: ['抽象', '白色'] },
+                { word: '美丽', tags: ['抽象'] },
+                { word: '幸福', tags: ['情感', '抽象'] },
+                { word: '孤独', tags: ['情感', '抽象', '黑色'] },
+                { word: '眼睛', tags: ['身体', '器官'] },
+                { word: '心脏', tags: ['身体', '器官', '红色'] },
+                { word: '大脑', tags: ['身体', '器官'] },
+                { word: '手掌', tags: ['身体'] },
+                { word: '脚丫', tags: ['身体'] },
+                { word: '耳朵', tags: ['身体', '器官'] },
+                { word: '鼻子', tags: ['身体', '器官'] },
+                { word: '嘴巴', tags: ['身体', '器官'] },
+                { word: '头发', tags: ['身体', '黑色'] },
+                { word: '血液', tags: ['身体', '红色'] },
+                { word: '春天', tags: ['时间', '季节', '绿色'] },
+                { word: '夏天', tags: ['时间', '季节', '红色'] },
+                { word: '秋天', tags: ['时间', '季节', '黄色'] },
+                { word: '冬天', tags: ['时间', '季节', '白色'] },
+                { word: '早晨', tags: ['时间', '天空'] },
+                { word: '夜晚', tags: ['时间', '黑色'] },
+                { word: '跑步', tags: ['动作', '运动'] },
+                { word: '游泳', tags: ['动作', '运动', '水'] },
+                { word: '飞翔', tags: ['动作', '天空'] },
+                { word: '歌唱', tags: ['动作', '艺术'] },
+                { word: '跳舞', tags: ['动作', '艺术'] },
+                { word: '睡觉', tags: ['动作', '休息'] },
+                { word: '吃饭', tags: ['动作', '食物'] },
+                { word: '喝水', tags: ['动作', '饮料'] },
+                { word: '微笑', tags: ['动作', '情感'] },
+                { word: '哭泣', tags: ['动作', '情感'] },
+                { word: '红色', tags: ['颜色'] },
+                { word: '蓝色', tags: ['颜色'] },
+                { word: '绿色', tags: ['颜色'] },
+                { word: '黄色', tags: ['颜色'] },
+                { word: '黑色', tags: ['颜色'] },
+                { word: '白色', tags: ['颜色'] },
+                { word: '紫色', tags: ['颜色'] },
+                { word: '橙色', tags: ['颜色'] },
+                { word: '粉色', tags: ['颜色'] },
+                { word: '灰色', tags: ['颜色'] },
+                { word: '音乐', tags: ['艺术', '声音'] },
+                { word: '电影', tags: ['艺术', '娱乐'] },
+                { word: '绘画', tags: ['艺术', '颜色'] },
+                { word: '诗歌', tags: ['艺术', '文化'] },
+                { word: '舞蹈', tags: ['艺术', '动作'] },
+                { word: '雕塑', tags: ['艺术', '石头'] },
+                { word: '戏剧', tags: ['艺术', '表演'] },
+                { word: '摄影', tags: ['艺术', '科技'] },
+                { word: '足球', tags: ['运动', '球类'] },
+                { word: '篮球', tags: ['运动', '球类'] },
+                { word: '网球', tags: ['运动', '球类'] },
+                { word: '泳姿', tags: ['运动', '水'] },
+                { word: '拳击', tags: ['运动', '战斗'] },
+                { word: '滑雪', tags: ['运动', '冬天', '白色'] },
+                { word: '医生', tags: ['职业', '社会'] },
+                { word: '老师', tags: ['职业', '社会'] },
+                { word: '警察', tags: ['职业', '社会'] },
+                { word: '厨师', tags: ['职业', '食物'] },
+                { word: '画家', tags: ['职业', '艺术'] },
+                { word: '歌手', tags: ['职业', '艺术'] },
+                { word: '农民', tags: ['职业', '自然'] },
+                { word: '军人', tags: ['职业', '战斗'] },
+                { word: '皇帝', tags: ['人物', '历史'] },
+                { word: '公主', tags: ['人物', '童话'] },
+                { word: '王子', tags: ['人物', '童话'] },
+                { word: '骑士', tags: ['人物', '历史', '战斗'] },
+                { word: '忍者', tags: ['人物', '战斗', '黑色'] },
+                { word: '海盗', tags: ['人物', '海洋'] },
+                { word: '天使', tags: ['人物', '天空', '白色'] },
+                { word: '恶魔', tags: ['人物', '黑色', '红色'] },
+                { word: '金钱', tags: ['抽象', '商业'] },
+                { word: '时间', tags: ['抽象', '时间'] },
+                { word: '空间', tags: ['抽象', '空间'] },
+                { word: '能量', tags: ['抽象', '科学'] },
+                { word: '魔法', tags: ['抽象', '幻想'] },
+                { word: '科学', tags: ['抽象', '知识'] },
+                { word: '历史', tags: ['抽象', '时间'] },
+                { word: '未来', tags: ['抽象', '时间'] },
+            ];
+
+            const wordTagMap = new Map();
+            wordBank.forEach(item => wordTagMap.set(item.word, item.tags));
+
+            // ==================== DOM ====================
+            const guessInput = document.getElementById('guessInput');
+            const btnGuess = document.getElementById('btnGuess');
+            const btnGiveUp = document.getElementById('btnGiveUp');
+            const chancesLeftEl = document.getElementById('chancesLeft');
+            const chancesBarFill = document.getElementById('chancesBarFill');
+            const resultCard = document.getElementById('resultCard');
+            const resultWordEl = document.getElementById('resultWord');
+            const dimMeaning = document.getElementById('dimMeaning');
+            const dimGlyph = document.getElementById('dimGlyph');
+            const dimPinyin = document.getElementById('dimPinyin');
+            const totalBarFill = document.getElementById('totalBarFill');
+            const totalPercent = document.getElementById('totalPercent');
+            const historyList = document.getElementById('historyList');
+            const historyEmpty = document.getElementById('historyEmpty');
+            const modalContainer = document.getElementById('modalContainer');
+
+            // ==================== 状态 ====================
+            const MAX_CHANCES = 30;
+            let targetWord = '';
+            let targetTags = [];
+            let targetPinyinStr = '';
+            let chancesLeft = MAX_CHANCES;
+            let historyEntries = [];
+            let gameOver = false;
+
+            // ==================== 工具函数 ====================
+            function getPinyin(word) {
+                if (typeof pinyinPro === 'undefined') return '';
+                try {
+                    const arr = pinyinPro.pinyin(word, { toneType: 'none', type: 'array' });
+                    return arr.join('');
+                } catch (e) {
+                    return '';
+                }
+            }
+
+            function levenshtein(s1, s2) {
+                const m = s1.length, n = s2.length;
+                if (m === 0) return n;
+                if (n === 0) return m;
+                const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+                for (let i = 0; i <= m; i++) dp[i][0] = i;
+                for (let j = 0; j <= n; j++) dp[0][j] = j;
+                for (let i = 1; i <= m; i++) {
+                    for (let j = 1; j <= n; j++) {
+                        const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+                        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+                    }
+                }
+                return dp[m][n];
+            }
+
+            function meaningSimilarity(tagsA, tagsB) {
+                if (tagsA.length === 0 && tagsB.length === 0) return 0;
+                const setA = new Set(tagsA), setB = new Set(tagsB);
+                let intersection = 0;
+                for (const t of setA) { if (setB.has(t)) intersection++; }
+                const union = new Set([...setA, ...setB]).size;
+                return union === 0 ? 0 : intersection / union;
+            }
+
+            function glyphSimilarity(wordA, wordB) {
+                const charsA = [...wordA], charsB = [...wordB];
+                const setA = new Set(charsA), setB = new Set(charsB);
+                let intersection = 0;
+                for (const c of setA) { if (setB.has(c)) intersection++; }
+                const union = new Set([...setA, ...setB]).size;
+                const overlap = union === 0 ? 0 : intersection / union;
+                const dist = levenshtein(wordA, wordB);
+                const maxLen = Math.max(charsA.length, charsB.length);
+                const editSim = maxLen === 0 ? 1 : 1 - dist / maxLen;
+                return (overlap + editSim) / 2;
+            }
+
+            function pinyinSimilarity(pinyinA, pinyinB) {
+                if (!pinyinA || !pinyinB) return 0;
+                const dist = levenshtein(pinyinA, pinyinB);
+                const maxLen = Math.max(pinyinA.length, pinyinB.length);
+                return maxLen === 0 ? 1 : 1 - dist / maxLen;
+            }
+
+            function computeMatch(guessWord) {
+                const guessTags = wordTagMap.get(guessWord) || [];
+                const guessPinyin = getPinyin(guessWord);
+                const meaning = meaningSimilarity(targetTags, guessTags);
+                const glyph = glyphSimilarity(targetWord, guessWord);
+                const pinyin = pinyinSimilarity(targetPinyinStr, guessPinyin);
+                const total = meaning * 0.4 + glyph * 0.35 + pinyin * 0.25;
+                return {
+                    score: Math.min(Math.round(total * 100), 99),
+                    meaning: Math.round(meaning * 100),
+                    glyph: Math.round(glyph * 100),
+                    pinyin: Math.round(pinyin * 100),
+                };
+            }
+
+            function getScoreClass(val) {
+                if (val >= 80) return 'green';
+                if (val >= 60) return 'teal';
+                if (val >= 40) return 'yellow';
+                if (val >= 20) return 'orange';
+                return 'red';
+            }
+
+            function updateHistoryDisplay() {
+                if (historyEntries.length === 0) {
+                    historyList.innerHTML = '';
+                    historyList.appendChild(historyEmpty);
+                    historyEmpty.style.display = '';
+                    return;
+                }
+                historyEmpty.style.display = 'none';
+                historyList.innerHTML = '';
+                historyEntries.forEach((entry, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    item.style.animationDelay = `${idx * 0.02}s`;
+                    item.innerHTML = `
+                        <span class="history-index">#${idx + 1}</span>
+                        <span class="history-word">${entry.word}</span>
+                        <span class="history-score${entry.score >= 80 ? ' high' : entry.score >= 40 ? ' mid' : ' low'}">${entry.score}%</span>
+                    `;
+                    item.addEventListener('click', () => showResultCard(entry.word, entry));
+                    historyList.appendChild(item);
+                });
+                historyList.scrollTop = historyList.scrollHeight;
+            }
+
+            function showResultCard(word, result) {
+                resultWordEl.textContent = word;
+                dimMeaning.textContent = result.meaning + '%';
+                dimMeaning.className = 'dim-value color-' + getScoreClass(result.meaning);
+                dimGlyph.textContent = result.glyph + '%';
+                dimGlyph.className = 'dim-value color-' + getScoreClass(result.glyph);
+                dimPinyin.textContent = result.pinyin + '%';
+                dimPinyin.className = 'dim-value color-' + getScoreClass(result.pinyin);
+                totalBarFill.style.width = result.score + '%';
+                totalPercent.textContent = result.score + '%';
+                totalPercent.className = 'total-percent color-' + getScoreClass(result.score);
+                resultCard.classList.add('visible');
+            }
+
+            function updateStatusBar() {
+                chancesLeftEl.textContent = chancesLeft;
+                const pct = (chancesLeft / MAX_CHANCES) * 100;
+                chancesBarFill.style.width = pct + '%';
+                if (chancesLeft <= 5) chancesBarFill.style.background = '#f76c6c';
+                else if (chancesLeft <= 10) chancesBarFill.style.background = '#f7a06c';
+                else chancesBarFill.style.background = 'var(--accent)';
+            }
+
+            function showModal(icon, title, text, btnText, callback) {
+                modalContainer.innerHTML = `
+                    <div class="modal-overlay" id="modalOverlay">
+                        <div class="modal">
+                            <div class="modal-icon">${icon}</div>
+                            <div class="modal-title">${title}</div>
+                            <div class="modal-text">${text}</div>
+                            <button class="modal-btn" id="modalBtn">${btnText}</button>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('modalBtn').onclick = () => {
+                    modalContainer.innerHTML = '';
+                    if (callback) callback();
+                };
+                document.getElementById('modalOverlay').onclick = (e) => {
+                    if (e.target === e.currentTarget) {
+                        modalContainer.innerHTML = '';
+                        if (callback) callback();
+                    }
+                };
+            }
+
+            function handleGuess() {
+                if (gameOver) return;
+                const guessWord = guessInput.value.trim();
+                if (!guessWord) {
+                    guessInput.focus();
+                    guessInput.style.animation = 'none';
+                    guessInput.offsetHeight;
+                    guessInput.style.animation = 'shake 0.4s ease';
+                    setTimeout(() => { guessInput.style.animation = ''; }, 400);
+                    return;
+                }
+
+                if (guessWord === targetWord) {
+                    const result = { score: 100, meaning: 100, glyph: 100, pinyin: 100 };
+                    historyEntries.unshift({ word: guessWord, ...result });
+                    showResultCard(guessWord, result);
+                    updateHistoryDisplay();
+                    gameOver = true;
+                    btnGuess.disabled = true;
+                    guessInput.disabled = true;
+                    showModal('🎉', '恭喜你猜中了！', `目标词就是「${targetWord}」，共用了 ${MAX_CHANCES - chancesLeft} 次机会。`, '再来一局', resetGame);
+                    return;
+                }
+
+                const result = computeMatch(guessWord);
+                historyEntries.unshift({ word: guessWord, ...result });
+                showResultCard(guessWord, result);
+                updateHistoryDisplay();
+                chancesLeft--;
+                updateStatusBar();
+
+                if (chancesLeft <= 0) {
+                    gameOver = true;
+                    btnGuess.disabled = true;
+                    guessInput.disabled = true;
+                    showModal('😢', '次数用完了', `目标词是「${targetWord}」，下次加油！`, '再来一局', resetGame);
+                }
+
+                guessInput.value = '';
+                guessInput.focus();
+                if (navigator.vibrate) navigator.vibrate(10);
+            }
+
+            function initGame() {
+                const idx = Math.floor(Math.random() * wordBank.length);
+                targetWord = wordBank[idx].word;
+                targetTags = wordBank[idx].tags;
+                targetPinyinStr = getPinyin(targetWord);
+                chancesLeft = MAX_CHANCES;
+                historyEntries = [];
+                gameOver = false;
+                btnGuess.disabled = false;
+                guessInput.disabled = false;
+                guessInput.value = '';
+                guessInput.focus();
+                resultCard.classList.remove('visible');
+                updateStatusBar();
+                updateHistoryDisplay();
+            }
+
+            function resetGame() {
+                initGame();
+            }
+
+            //  shake 动画
+            const shakeStyle = document.createElement('style');
+            shakeStyle.textContent = `@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-4px)}}`;
+            document.head.appendChild(shakeStyle);
+
+            // ==================== 事件 ====================
+            btnGuess.addEventListener('click', handleGuess);
+            guessInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault();
+                    handleGuess(); }
+            });
+            btnGiveUp.addEventListener('click', () => {
+                gameOver = true;
+                btnGuess.disabled = true;
+                guessInput.disabled = true;
+                showModal('🏳️', '已放弃', `目标词是「${targetWord}」，下次一定能猜到！`, '再来一局', resetGame);
+            });
+
+            // ==================== 启动 ====================
+            initGame();
+        })();
+    </script>
+</body>
+</html>
