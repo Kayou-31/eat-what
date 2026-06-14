@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>张雪峰巧乐兹大冒险</title>
+    <style>
+        :root { --bg: #1a1a2e; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+            font-family: 'PingFang SC','Microsoft YaHei',sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none; -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        #gc {
+            position: relative;
+            width: 100vw; max-width: 500px; height: 100vh; max-height: 850px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+        }
+        canvas {
+            display: block; border-radius: 14px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.55);
+            max-width: 100%; max-height: 100%; pointer-events: none;
+        }
+        #sc {
+            position: absolute; top: 6%; left: 50%; transform: translateX(-50%);
+            font-size: 3rem; font-weight: 900; color: #fff;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+            z-index: 2; pointer-events: none;
+        }
+        #sc.pulse { transform: translateX(-50%) scale(1.35); }
+        #mo {
+            position: absolute; inset: 0; display: flex;
+            flex-direction: column; align-items: center; justify-content: center;
+            z-index: 3; pointer-events: auto;
+        }
+        .mb {
+            background: rgba(10,10,20,0.85); backdrop-filter: blur(10px);
+            border-radius: 22px; padding: 26px 30px; text-align: center; color: #fff;
+            border: 1.5px solid rgba(255,255,255,0.15);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+            animation: pi 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+        }
+        @keyframes pi {
+            0% { opacity: 0; transform: scale(0.65); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .mt { font-size: 1.5rem; font-weight: 800; margin-bottom: 6px; }
+        .ms { font-size: 0.82rem; color: #bbb; margin-bottom: 16px; }
+        .mss { font-size: 2.6rem; font-weight: 900; color: #FFD700; }
+        .mbs { font-size: 0.88rem; color: #aaa; margin-top: 4px; }
+        .mbs span { color: #FFD700; font-weight: 700; }
+        .btn {
+            display: inline-block; padding: 13px 38px; font-size: 1rem; font-weight: 700;
+            border: none; border-radius: 28px; cursor: pointer; color: #fff;
+            transition: all 0.2s; pointer-events: auto;
+        }
+        .btn-s { background: linear-gradient(135deg,#7C6FF7,#A78BFA); box-shadow: 0 6px 24px rgba(124,111,247,0.45); }
+        .btn-s:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(124,111,247,0.6); }
+        .btn-r { background: linear-gradient(135deg,#FF6B35,#FF8C5A); box-shadow: 0 6px 22px rgba(255,107,53,0.4); margin-top: 12px; }
+        .btn-r:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(255,107,53,0.55); }
+        .btn:active { transform: scale(0.94); }
+        .hn { display: none !important; }
+    </style>
+</head>
+<body>
+<div id="gc">
+    <canvas id="cv"></canvas>
+    <div id="sc" class="hn">0</div>
+    <div id="mo">
+        <div class="mb" id="mStart">
+            <div class="mt">🎓 张雪峰巧乐兹大冒险</div>
+            <div class="ms">穿过障碍，成为考研王者！</div>
+            <button class="btn btn-s" id="btnStart">⚡ 开始游戏</button>
+        </div>
+        <div class="mb hn" id="mEnd">
+            <div class="mt" id="endT">💥 撞上了！</div>
+            <div class="mss" id="endS">0</div>
+            <div class="ms">个障碍穿过</div>
+            <div class="mbs">🏆 最高记录：<span id="endB">0</span> 个</div>
+            <button class="btn btn-r" id="btnRestart">🔄 再来一局</button>
+        </div>
+        <div class="mb hn" id="mReady">
+            <div class="mt">👆 准备好了吗？</div>
+            <div class="ms">点击屏幕或按空格开始飞行</div>
+        </div>
+    </div>
+</div>
+<script>
+(function(){
+var gc=document.getElementById('gc');
+var cv=document.getElementById('cv');
+var ctx=cv.getContext('2d');
+var sc=document.getElementById('sc');
+var mStart=document.getElementById('mStart');
+var mEnd=document.getElementById('mEnd');
+var mReady=document.getElementById('mReady');
+var endT=document.getElementById('endT');
+var endS=document.getElementById('endS');
+var endB=document.getElementById('endB');
+var btnStart=document.getElementById('btnStart');
+var btnRestart=document.getElementById('btnRestart');
+
+var GW=400, GH=650, GH2=48, PAT=8, PAB=GH-GH2;
+var GR=1480, JV=-475, PS=175, PW=58, PGAP=160, PSI=1.65;
+var PX=100, PWW=36, PHH=46;
+var PTYPES=['qiaolezi','treadmill','sprite'];
+
+var py,pv,pr, pipes=[], score=0, best=0;
+var gs='start', lt=0, pst=0, shake=0, parts=[];
+var bgo=0, go=0, ba=1, bt=0;
+var spop=null;
+
+/* ─── 工具：圆角矩形路径 ─── */
+function rri(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+    ctx.arcTo(x+w,y,x+w,y+r,r); ctx.lineTo(x+w,y+h-r);
+    ctx.arcTo(x+w,y+h,x+w-r,y+h,r); ctx.lineTo(x+r,y+h);
+    ctx.arcTo(x,y+h,x,y+h-r,r); ctx.lineTo(x,y+r);
+    ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
+}
+
+/* ─── 背景天空 + 山 + 云 ─── */
+function drBG(){
+    var g=ctx.createLinearGradient(0,0,0,PAB);
+    g.addColorStop(0,'#3A7BD5'); g.addColorStop(0.45,'#6DB3E8'); g.addColorStop(1,'#B8DCF5');
+    ctx.fillStyle=g; ctx.fillRect(0,0,GW,PAB);
+    var mo=bgo*0.15;
+    var mtns=[['#5B7EA0',35,28,1],['#7DA0BD',22,20,2],['#9ABDD5',10,12,3]];
+    for(var i=0;i<mtns.length;i++){
+        var m=mtns[i]; ctx.fillStyle=m[0]; ctx.beginPath(); ctx.moveTo(0,PAB);
+        for(var x=-20;x<GW+40;x+=2){
+            var h=m[1]+Math.sin(x*0.018+mo*m[3]*0.7)*m[2]+Math.cos(x*0.025+i)*10;
+            ctx.lineTo(x,PAB-h);
+        }
+        ctx.lineTo(GW,PAB); ctx.closePath(); ctx.fill();
+    }
+    /* 云朵 */
+    var cls=[[50,55,1.1,0.85],[200,90,0.75,0.7],[330,40,0.9,0.8],[140,130,0.6,0.65],
+             [380,105,0.7,0.72],[260,65,0.5,0.6],[80,145,0.55,0.55]];
+    for(var i=0;i<cls.length;i++){
+        var c=cls[i]; var cx=((c[0]+bgo*c[2]*0.25)%(GW+120))-60;
+        ctx.fillStyle='rgba(255,255,255,'+c[3]+')'; ctx.beginPath();
+        ctx.arc(cx,c[1],17*c[2],0,Math.PI*2);
+        ctx.arc(cx+16*c[2],c[1]-7*c[2],20*c[2],0,Math.PI*2);
+        ctx.arc(cx+33*c[2],c[1]+2*c[2],15*c[2],0,Math.PI*2);
+        ctx.arc(cx+14*c[2],c[1]+8*c[2],12*c[2],0,Math.PI*2);
+        ctx.fill();
+    }
+}
+
+/* ─── 地面 ─── */
+function drGnd(){
+    var g=ctx.createLinearGradient(0,PAB,0,PAB+GH2);
+    g.addColorStop(0,'#4A9A3A'); g.addColorStop(0.35,'#4A9A3A'); g.addColorStop(1,'#3A7028');
+    ctx.fillStyle=g; ctx.fillRect(0,PAB,GW,GH2);
+    var gx=go%28; ctx.fillStyle='#6BC05A';
+    for(var x=-28+gx;x<GW+28;x+=28){
+        ctx.beginPath(); ctx.moveTo(x,PAB); ctx.lineTo(x+7,PAB-9); ctx.lineTo(x+15,PAB); ctx.fill();
+    }
+    var gx2=(go+14)%22; ctx.fillStyle='#7DD06A';
+    for(var x=-22+gx2;x<GW+22;x+=22){
+        ctx.beginPath(); ctx.moveTo(x,PAB); ctx.lineTo(x+5,PAB-5); ctx.lineTo(x+10,PAB); ctx.fill();
+    }
+    var fx=go%52;
+    for(var x=-52+fx;x<GW+52;x+=52){
+        var fy=PAB+8; ctx.fillStyle='#FFE066'; ctx.beginPath(); ctx.arc(x,fy,3.5,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#FFF9C4'; ctx.beginPath(); ctx.arc(x,fy,1.8,0,Math.PI*2); ctx.fill();
+        ctx.strokeStyle='#4A8A3A'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x,fy+3.5); ctx.lineTo(x,fy+9); ctx.stroke();
+    }
+    ctx.strokeStyle='#2E5A20'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(0,PAB); ctx.lineTo(GW,PAB); ctx.stroke(); ctx.lineWidth=1;
+}
+
+/* ─── 障碍物：巧乐兹 ─── */
+function drQLZ(x,yt,h,ud){
+    if(h<=0) return; ctx.save(); rri(x,yt,PW,h,7); ctx.clip();
+    var bg=ctx.createLinearGradient(x,yt,x+PW,yt);
+    bg.addColorStop(0,'#FFF8E7'); bg.addColorStop(0.3,'#FFFDF5'); bg.addColorStop(0.7,'#F5E6C8'); bg.addColorStop(1,'#E0D0A8');
+    ctx.fillStyle=bg; ctx.fillRect(x,yt,PW,h);
+    ctx.fillStyle='#5C2E0B'; ctx.fillRect(x,yt,PW,5); ctx.fillRect(x+PW-5,yt,5,h);
+    ctx.fillStyle='#3E1A04';
+    var dc=Math.floor(h/24);
+    for(var i=0;i<dc;i++){
+        var dy=yt+9+i*24+Math.sin(i*1.8)*5;
+        if(dy<yt+h-6){ ctx.fillRect(x+7,dy,PW-14,3); ctx.fillRect(x+3,dy-2,5,4); ctx.fillRect(x+PW-8,dy-1,5,3); }
+    }
+    var dey=ud?yt:yt+h-11; ctx.fillStyle='#3E1A04'; ctx.fillRect(x+2,dey,PW-4,11);
+    var sy=ud?yt+h-7:yt;
+    ctx.fillStyle='#D4A574'; ctx.fillRect(x+PW/2-5,sy-(ud?0:13),10,20);
+    ctx.fillStyle='#C49A6C'; ctx.fillRect(x+PW/2-3,sy-(ud?0:13)+2,6,16);
+    ctx.fillStyle='rgba(255,255,255,0.2)'; ctx.fillRect(x+5,yt+5,6,h-18);
+    ctx.restore();
+    ctx.strokeStyle='#3E1A04'; ctx.lineWidth=2; rri(x,yt,PW,h,7); ctx.stroke(); ctx.lineWidth=1;
+}
+
+/* ─── 障碍物：跑步机 ─── */
+function drTM(x,yt,h,ud){
+    if(h<=0) return; ctx.save(); rri(x,yt,PW,h,6); ctx.clip();
+    var fg=ctx.createLinearGradient(x,yt,x+PW,yt);
+    fg.addColorStop(0,'#5A5A62'); fg.addColorStop(0.5,'#6E6E78'); fg.addColorStop(1,'#4A4A52');
+    ctx.fillStyle=fg; ctx.fillRect(x,yt,PW,h);
+    ctx.fillStyle='#4A4A52'; ctx.fillRect(x,yt,6,h); ctx.fillRect(x+PW-6,yt,6,h);
+    ctx.fillStyle='#1A1A1E'; ctx.fillRect(x+7,yt+8,PW-14,h-16);
+    ctx.fillStyle='#25252A';
+    var bc=Math.floor((h-16)/10);
+    for(var i=0;i<bc;i++){
+        var by=yt+10+i*10; if(by<yt+h-10) ctx.fillRect(x+9,by,PW-18,2);
+    }
+    var pny=ud?yt+h-16:yt+4;
+    ctx.fillStyle='#333338'; ctx.fillRect(x+4,pny,PW-8,14);
+    ctx.fillStyle='#FF3B30'; ctx.fillRect(x+PW/2-10,pny+3,8,3);
+    ctx.fillStyle='#00FF41'; ctx.fillRect(x+PW/2+2,pny+3,6,3);
+    var ry=ud?yt+3:yt+h-10;
+    ctx.fillStyle='#888'; ctx.fillRect(x+3,ry,PW-6,8);
+    ctx.restore();
+    ctx.strokeStyle='#3A3A42'; ctx.lineWidth=2; rri(x,yt,PW,h,6); ctx.stroke(); ctx.lineWidth=1;
+}
+
+/* ─── 障碍物：雪碧 ─── */
+function drSP(x,yt,h,ud){
+    if(h<=0) return; ctx.save(); rri(x,yt,PW,h,9); ctx.clip();
+    var bg=ctx.createLinearGradient(x,yt,x+PW,yt);
+    bg.addColorStop(0,'#1E7A30'); bg.addColorStop(0.25,'#2DAA45'); bg.addColorStop(0.5,'#3CC858'); bg.addColorStop(0.75,'#2DAA45'); bg.addColorStop(1,'#1E7A30');
+    ctx.fillStyle=bg; ctx.fillRect(x,yt,PW,h);
+    var capH=10, capY=ud?yt+h-capH:yt;
+    ctx.fillStyle='#C0C0C0'; ctx.fillRect(x+5,capY,PW-10,capH);
+    var lh=Math.min(35,h*0.35), ly=ud?yt+14:yt+h-lh-16;
+    if(lh>8&&ly+lh<=yt+h&&ly>=yt){
+        ctx.fillStyle='#F5F5F0'; ctx.fillRect(x+3,ly,PW-6,lh);
+        ctx.fillStyle='#2DAA45'; ctx.fillRect(x+8,ly+4,PW-16,6);
+        ctx.fillStyle='#FFFFFF'; ctx.font='bold 7px "PingFang SC","Microsoft YaHei",sans-serif'; ctx.textAlign='center';
+        ctx.fillText('雪碧',x+PW/2,ly+lh/2+2); ctx.textAlign='start';
+    }
+    ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(x+4,yt+4,5,h-16);
+    ctx.restore();
+    ctx.strokeStyle='#1E7A30'; ctx.lineWidth=2; rri(x,yt,PW,h,9); ctx.stroke(); ctx.lineWidth=1;
+}
+
+/* ─── 管道对（按类型分派） ─── */
+function drPipe(p){
+    var gt=p.gapY-PGAP/2;
+    var gb=p.gapY+PGAP/2;
+    var topH=gt-PAT;
+    var botH=PAB-gb;
+    switch(p.type){
+        case 'qiaolezi':
+            drQLZ(p.x, PAT, topH, false);
+            drQLZ(p.x, gb, botH, false);
+            break;
+        case 'treadmill':
+            drTM(p.x, PAT, topH, false);
+            drTM(p.x, gb, botH, false);
+            break;
+        case 'sprite':
+            drSP(p.x, PAT, topH, false);
+            drSP(p.x, gb, botH, false);
+            break;
+        default:
+            drQLZ(p.x, PAT, topH, false);
+            drQLZ(p.x, gb, botH, false);
+    }
+}
+
+/* ─── 玩家（张雪峰） ─── */
+function drPlr(x, y, rot){
+    ctx.save();
+    var cx=x+PWW/2, cy=y+PHH/2;
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    var px=-PWW/2, py2=-PHH/2+2;
+    /* 西装 */
+    ctx.fillStyle='#2C2C2C'; ctx.fillRect(px+8,py2+22,PWW-16,PHH-24);
+    ctx.fillStyle='#1A1A1A'; ctx.fillRect(px+7,py2+22,3,PHH-24); ctx.fillRect(px+PWW-10,py2+22,3,PHH-24);
+    /* 领带 */
+    ctx.fillStyle='#FFFFFF'; ctx.beginPath(); ctx.moveTo(px+PWW/2,py2+28); ctx.lineTo(px+PWW/2-7,py2+22); ctx.lineTo(px+PWW/2+7,py2+22); ctx.fill();
+    ctx.fillStyle='#C0392B'; ctx.fillRect(px+PWW/2-2,py2+26,3,8);
+    /* 头 */
+    ctx.fillStyle='#FDDCB5'; ctx.beginPath(); ctx.arc(px+PWW/2,py2+13,10,0,Math.PI*2); ctx.fill();
+    /* 头发 */
+    ctx.fillStyle='#1A1A1A'; ctx.beginPath(); ctx.arc(px+PWW/2,py2+10,11,Math.PI,Math.PI*2); ctx.fill();
+    ctx.fillRect(px+PWW/2-11,py2+5,4,7); ctx.fillRect(px+PWW/2+7,py2+5,4,7); ctx.fillRect(px+PWW/2-3,py2-2,6,4);
+    /* 眉毛 */
+    ctx.fillStyle='#1A1A1A'; ctx.fillRect(px+PWW/2-7,py2+9,6,5); ctx.fillStyle='#FDDCB5'; ctx.fillRect(px+PWW/2-6,py2+10,4,3);
+    ctx.fillStyle='#1A1A1A'; ctx.fillRect(px+PWW/2+1,py2+9,6,5); ctx.fillStyle='#FDDCB5'; ctx.fillRect(px+PWW/2+2,py2+10,4,3);
+    /* 嘴 */
+    ctx.fillStyle='#D4897A'; ctx.fillRect(px+PWW/2-2,py2+18,4,2);
+    /* 眼睛高光 */
+    ctx.fillStyle='#FFFFFF'; ctx.fillRect(px+PWW/2-5,py2+10,2,1); ctx.fillRect(px+PWW/2+3,py2+10,2,1);
+    /* 手臂 */
+    ctx.fillStyle='#2C2C2C'; ctx.fillRect(px+3,py2+24,5,11); ctx.fillRect(px+PWW-8,py2+24,5,11);
+    ctx.fillStyle='#FDDCB5'; ctx.fillRect(px+3,py2+34,5,3); ctx.fillRect(px+PWW-8,py2+34,5,3);
+    /* 鞋子 */
+    ctx.fillStyle='#1A1A1A'; ctx.fillRect(px+9,py2+PHH-8,6,6); ctx.fillRect(px+PWW-15,py2+PHH-8,6,6);
+    ctx.fillStyle='#3A2A1A'; ctx.fillRect(px+8,py2+PHH-3,8,3); ctx.fillRect(px+PWW-16,py2+PHH-3,8,3);
+    /* 领带底部 */
+    ctx.fillStyle='#E74C3C'; ctx.fillRect(px+1,py2+26,4,7); ctx.fillStyle='#FFFFFF'; ctx.fillRect(px+1,py2+27,3,1);
+    ctx.restore();
+}
+
+/* ─── 对话气泡 ─── */
+function drBubble(){
+    if(gs!=='start') return;
+    var bx=PX+PWW+6, by=py-12, txt='你飞不过我你信不信';
+    ctx.font='bold 11px "PingFang SC","Microsoft YaHei",sans-serif';
+    var tw=ctx.measureText(txt).width, th=14, bw=tw+20, bh=th+16;
+    ctx.fillStyle='rgba(255,255,255,'+(0.92*ba)+')'; rri(bx,by-bh,bw,bh,8); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,'+(0.25*ba)+')'; ctx.lineWidth=1.5; rri(bx,by-bh,bw,bh,8); ctx.stroke(); ctx.lineWidth=1;
+    ctx.fillStyle='rgba(255,255,255,'+(0.92*ba)+')'; ctx.beginPath(); ctx.moveTo(bx+14,by); ctx.lineTo(bx+6,by+8); ctx.lineTo(bx+20,by); ctx.fill();
+    ctx.fillStyle='rgba(30,30,30,'+(0.9*ba)+')'; ctx.textAlign='center'; ctx.fillText(txt,bx+bw/2,by-bh/2+th/2); ctx.textAlign='start';
+}
+
+/* ─── 粒子 +1 特效 ─── */
+function drParts(){
+    for(var i=0;i<parts.length;i++){
+        var p=parts[i]; var a=Math.max(0,p.life/p.maxLife);
+        ctx.fillStyle='rgba('+p.r+','+p.g+','+p.b+','+a+')';
+        if(p.shape==='star'){
+            ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot||0); ctx.beginPath();
+            for(var j=0;j<5;j++){
+                var ang=(j*Math.PI*2)/5-Math.PI/2;
+                var or=p.size,ir=p.size*0.4;
+                var ox=Math.cos(ang)*or,oy=Math.sin(ang)*or;
+                var ix=Math.cos(ang+Math.PI/5)*ir,iy=Math.sin(ang+Math.PI/5)*ir;
+                if(j===0) ctx.moveTo(ox,oy); else ctx.lineTo(ox,oy);
+                ctx.lineTo(ix,iy);
+            }
+            ctx.fill(); ctx.restore();
+        } else { ctx.fillRect(p.x,p.y,p.size,p.size); }
+    }
+    if(spop){
+        var a=spop.life/spop.maxLife;
+        ctx.fillStyle='rgba(255,215,0,'+a+')';
+        ctx.font='bold 20px "PingFang SC","Microsoft YaHei",sans-serif';
+        ctx.textAlign='center'; ctx.fillText('+1',spop.x,spop.y-(1-a)*35); ctx.textAlign='start';
+    }
+}
+
+/* ─── 生成粒子 ─── */
+function spP(x,y,ct,cls,shp){
+    for(var i=0;i<ct;i++){
+        var c=cls[Math.floor(Math.random()*cls.length)];
+        parts.push({
+            x:x,y:y, vx:(Math.random()-0.5)*220, vy:(Math.random()-0.5)*220-90,
+            size:2+Math.random()*4.5, life:0.5+Math.random()*0.7, maxLife:0.5+Math.random()*0.7,
+            r:c[0],g:c[1],b:c[2], shape:shp||'square', rot:Math.random()*Math.PI*2
+        });
+    }
+}
+
+/* ─── 重置状态 ─── */
+function rG(){
+    py=GH/2-PHH/2; pv=0; pr=0; pipes=[]; score=0;
+    parts=[]; spop=null; shake=0; pst=0; bgo=0; go=0; ba=1; bt=0;
+    sc.textContent='0'; sc.classList.remove('pulse');
+}
+
+/* ─── 生成管道对 ─── */
+function spPp(){
+    var mn=PAT+PGAP/2+28, mx=PAB-PGAP/2-28;
+    var gy2=mn+Math.random()*(mx-mn);
+    pipes.push({x:GW+20,gapY:gy2,scored:false,type:PTYPES[Math.floor(Math.random()*PTYPES.length)]});
+}
+
+/* ─── 分数跳动 ─── */
+function psS(){ sc.classList.add('pulse'); setTimeout(function(){sc.classList.remove('pulse');},160); }
+
+/* ─── 碰撞检测 ─── */
+function chC(px2,py2,pw2,ph2,p){
+    var gt=p.gapY-PGAP/2, gb=p.gapY+PGAP/2;
+    if(px2+pw2<=p.x||px2>=p.x+PW) return false;
+    if(py2<=gt) return true;
+    if(py2+ph2>=gb) return true;
+    return false;
+}
+
+/* ─── 游戏结束 ─── */
+function gOver(){
+    gs='end'; shake=0.55;
+    spP(PX+PWW/2,py+PHH/2,35,[[92,46,11],[255,243,214],[62,26,4],[255,107,53],[255,215,0]],'square');
+    if(score>best){ best=score; try{localStorage.setItem('zxf_b2',best);}catch(e){} }
+    endS.textContent=score; endB.textContent=best;
+    if(score>=15) endT.textContent='🎉 考研王者！';
+    else if(score>=8) endT.textContent='👍 还不错！';
+    else if(score>=3) endT.textContent='😅 继续努力！';
+    else endT.textContent='💥 撞上了！';
+    mEnd.classList.remove('hn'); mReady.classList.add('hn'); sc.classList.add('hn');
+}
+
+/* ─── 进入准备 ─── */
+function eR(){
+    rG(); gs='ready'; lt=performance.now();
+    mStart.classList.add('hn'); mEnd.classList.add('hn'); mReady.classList.remove('hn'); sc.classList.add('hn');
+    spPp();
+}
+
+/* ─── 开始游戏 ─── */
+function sP(){
+    gs='playing'; lt=performance.now(); pst=0;
+    mStart.classList.add('hn'); mEnd.classList.add('hn'); mReady.classList.add('hn'); sc.classList.remove('hn');
+    sc.textContent='0'; pv=JV; pr=-0.4;
+    spP(PX+PWW/2, py+PHH, 6, [[255,255,255],[200,220,255],[180,200,240]], 'square');
+}
+
+/* ─── 物理更新 ─── */
+function upd(dt){
+    if(gs!=='playing') return;
+    if(shake>0) shake=Math.max(0,shake-dt*3.2);
+    bgo+=PS*dt*0.28; go+=PS*dt;
+    pv+=GR*dt; py+=pv*dt;
+    var tr=Math.max(-0.4,Math.min(0.65,pv/780));
+    pr+=(tr-pr)*Math.min(1,dt*9);
+    if(py<PAT){ py=PAT; pv=0; }
+    if(py+PHH>PAB){ py=PAB-PHH; gOver(); return; }
+    for(var i=0;i<pipes.length;i++){
+        var p=pipes[i]; p.x-=PS*dt;
+        if(chC(PX,py,PWW,PHH,p)){ gOver(); return; }
+        if(!p.scored&&p.x+PW<PX){
+            p.scored=true; score++; sc.textContent=score; psS();
+            spop={x:PX+PWW/2,y:py-8,life:1.3,maxLife:1.3};
+            spP(PX+PWW/2,py-8,10,[[255,215,0],[255,255,255],[255,180,50],[255,240,100]],'star');
+        }
+    }
+    pipes=pipes.filter(function(p){return p.x+PW>-25;});
+    pst+=dt; if(pst>=PSI){ pst=0; spPp(); }
+    for(var i=0;i<parts.length;i++){
+        var p=parts[i]; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=280*dt; p.life-=dt;
+        if(p.shape=='star') p.rot=(p.rot||0)+dt*5;
+    }
+    parts=parts.filter(function(p){return p.life>0;});
+    if(spop){ spop.life-=dt; if(spop.life<=0) spop=null; }
+}
+
+/* ─── 渲染 ─── */
+function rdr(){
+    ctx.clearRect(0,0,GW,GH);
+    var sx=0,sy=0;
+    if(shake>0){ sx=(Math.random()-0.5)*shake*22; sy=(Math.random()-0.5)*shake*22; }
+    ctx.save(); ctx.translate(sx,sy);
+    drBG();
+    for(var i=0;i<pipes.length;i++) drPipe(pipes[i]);
+    drGnd();
+    drParts();
+    if(gs!=='start'){
+        var sa=Math.max(0,1-(PAB-(py+PHH))/40);
+        ctx.fillStyle='rgba(0,0,0,'+(sa*0.25)+')';
+        ctx.beginPath(); ctx.ellipse(PX+PWW/2,PAB-1,PWW/2,4,0,0,Math.PI*2); ctx.fill();
+    }
+    drPlr(PX,py,pr);
+    drBubble();
+    ctx.restore();
+}
+
+/* ─── 动画循环 ─── */
+function gl(ts){
+    if(gs==='start'){
+        var n=ts/1000;
+        py=GH/2-PHH/2+Math.sin(n*2.6)*14;
+        pr=Math.sin(n*2.6)*0.1;
+        bgo+=0.45; go+=0.7; bt+=0.016; ba=0.8+Math.sin(bt*1.5)*0.2;
+        rdr();
+        requestAnimationFrame(gl);
+        return;
+    }
+    if(lt===0) lt=ts;
+    var dt=(ts-lt)/1000;
+    if(dt<=0) dt=0.016;
+    if(dt>0.2) dt=0.2;
+    lt=ts;
+    upd(dt);
+    rdr();
+    requestAnimationFrame(gl);
+}
+
+/* ─── 输入处理 ─── */
+function hi(e){
+    e.preventDefault();
+    if(gs==='ready'){ sP(); return; }
+    if(gs==='end'){ eR(); return; }
+    if(gs==='playing'){ pv=JV; pr=-0.4; spP(PX+PWW/2,py+PHH,6,[[255,255,255],[200,220,255],[180,200,240]],'square'); }
+}
+
+gc.addEventListener('click',hi);
+gc.addEventListener('touchstart',function(e){ e.preventDefault(); hi(e); },{passive:false});
+document.addEventListener('keydown',function(e){
+    if(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW'){ e.preventDefault(); hi(e); }
+});
+document.addEventListener('keyup',function(e){ if(e.code==='Space') e.preventDefault(); });
+
+btnStart.addEventListener('click',function(e){ e.stopPropagation(); eR(); });
+btnStart.addEventListener('touchstart',function(e){ e.stopPropagation(); eR(); });
+btnRestart.addEventListener('click',function(e){ e.stopPropagation(); eR(); });
+btnRestart.addEventListener('touchstart',function(e){ e.stopPropagation(); eR(); });
+
+/* ─── 响应式缩放 ─── */
+function rcv(){
+    var mw=gc.clientWidth, mh=gc.clientHeight;
+    var r=Math.min(mw/GW,mh/GH);
+    cv.style.width=GW*r+'px'; cv.style.height=GH*r+'px';
+}
+window.addEventListener('resize',rcv);
+
+/* ─── 启动 ─── */
+cv.width=GW; cv.height=GH; rcv();
+try{ var s=localStorage.getItem('zxf_b2'); if(s) best=parseInt(s)||0; }catch(e){}
+py=GH/2-PHH/2; pv=0; pr=0; lt=performance.now(); requestAnimationFrame(gl);
+})();
+</script>
+</body>
+</html>
