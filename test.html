@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPS 练枪场</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            background: #0a0a0f;
+            font-family: 'Segoe UI', 'Arial', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 游戏容器 */
+        .game-container {
+            background: #111118;
+            border: 2px solid #2a2a3a;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 0 60px rgba(0, 100, 255, 0.05), inset 0 0 60px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        /* 顶部状态栏 */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 20px 16px 20px;
+            color: #c0c0d0;
+            font-size: 15px;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #1e1e2e;
+            margin-bottom: 10px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .hud-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .hud-item .label {
+            color: #6a6a8a;
+            font-size: 12px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .hud-item .value {
+            color: #e0e0f0;
+            font-size: 20px;
+            font-weight: 700;
+            min-width: 40px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .hud-item .value.highlight {
+            color: #4af;
+        }
+        .hud-item .value.orange {
+            color: #fa6;
+        }
+        .hud-item .value.green {
+            color: #4e6;
+        }
+        .hud-item .value.red {
+            color: #f55;
+        }
+
+        /* 模式选择按钮组 */
+        .mode-switch {
+            display: flex;
+            gap: 6px;
+        }
+
+        .mode-btn {
+            background: #1a1a28;
+            border: 1px solid #2a2a3e;
+            color: #7a7a9a;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            letter-spacing: 0.3px;
+        }
+
+        .mode-btn:hover {
+            background: #222236;
+            color: #b0b0d0;
+            border-color: #3a3a5a;
+        }
+
+        .mode-btn.active {
+            background: #1a2a4a;
+            border-color: #4af;
+            color: #8cf;
+            box-shadow: 0 0 20px rgba(68, 170, 255, 0.08);
+        }
+
+        /* Canvas 画布 */
+        canvas {
+            display: block;
+            background: #0d0d14;
+            border-radius: 8px;
+            cursor: none;
+            width: 1000px;
+            height: 600px;
+            border: 1px solid #1a1a2a;
+        }
+
+        /* 底部控制栏 */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px 6px 20px;
+            border-top: 1px solid #1e1e2e;
+            margin-top: 10px;
+        }
+
+        .controls-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .ctrl-btn {
+            background: #1a1a28;
+            border: 1px solid #2a2a3e;
+            color: #8a8aaa;
+            padding: 8px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+            letter-spacing: 0.5px;
+        }
+
+        .ctrl-btn:hover {
+            background: #22223a;
+            color: #d0d0f0;
+            border-color: #4a4a6a;
+        }
+
+        .ctrl-btn.start {
+            background: #1a3a2a;
+            border-color: #2a6a3a;
+            color: #4e6;
+        }
+
+        .ctrl-btn.start:hover {
+            background: #1e4a32;
+            border-color: #3a8a4a;
+            box-shadow: 0 0 20px rgba(68, 238, 102, 0.1);
+        }
+
+        .ctrl-btn.stop {
+            background: #3a1a1a;
+            border-color: #6a2a2a;
+            color: #f66;
+        }
+
+        .ctrl-btn.stop:hover {
+            background: #4a1e1e;
+            border-color: #8a3a3a;
+        }
+
+        .difficulty {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #6a6a8a;
+            font-size: 13px;
+        }
+
+        .diff-btn {
+            background: #14141e;
+            border: 1px solid #22223a;
+            color: #6a6a8a;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .diff-btn:hover {
+            background: #1c1c2e;
+            color: #aaaac0;
+        }
+
+        .diff-btn.active {
+            background: #1a1a2e;
+            border-color: #4a4a7a;
+            color: #99a;
+        }
+
+        /* 结束提示 */
+        .game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border-radius: 12px;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+        }
+
+        .game-over-overlay.show {
+            display: flex;
+        }
+
+        .game-over-box {
+            background: #14141e;
+            border: 1px solid #2a2a4a;
+            border-radius: 16px;
+            padding: 40px 60px;
+            text-align: center;
+            box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+        }
+
+        .game-over-box h2 {
+            color: #e0e0f0;
+            font-size: 32px;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+        }
+
+        .game-over-box .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 40px;
+            margin: 24px 0;
+            text-align: left;
+        }
+
+        .game-over-box .stat-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            color: #8a8aaa;
+            font-size: 16px;
+        }
+
+        .game-over-box .stat-row .sv {
+            color: #e0e0f0;
+            font-weight: 700;
+        }
+
+        .game-over-box .stat-row .sv.gold {
+            color: #fd6;
+        }
+
+        .game-over-box .restart-btn {
+            background: #1a2a4a;
+            border: 1px solid #4af;
+            color: #8cf;
+            padding: 12px 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 16px;
+            transition: all 0.2s;
+        }
+
+        .game-over-box .restart-btn:hover {
+            background: #1e325a;
+            box-shadow: 0 0 30px rgba(68, 170, 255, 0.15);
+        }
+
+        /* 模式说明 */
+        .mode-hint {
+            color: #4a4a6a;
+            font-size: 12px;
+            padding: 0 20px 4px 20px;
+            text-align: center;
+            letter-spacing: 0.5px;
+        }
+
+        /* 滚动条隐藏 */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 响应式 */
+        @media (max-width: 1100px) {
+            canvas {
+                width: 90vw;
+                height: calc(90vw * 0.6);
+            }
+        }
+
+        @media (max-width: 800px) {
+            .game-container {
+                padding: 10px;
+            }
+            .hud {
+                font-size: 13px;
+                padding: 4px 10px 10px 10px;
+                gap: 10px;
+            }
+            .hud-left, .hud-right {
+                gap: 12px;
+            }
+            .hud-item .value {
+                font-size: 16px;
+                min-width: 30px;
+            }
+            .controls {
+                flex-direction: column;
+                gap: 10px;
+                padding: 10px 10px 4px 10px;
+            }
+            .mode-btn {
+                padding: 4px 10px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container" id="app">
+    <!-- 顶栏 -->
+    <div class="hud">
+        <div class="hud-left">
+            <div class="hud-item">
+                <span class="label">得分</span>
+                <span class="value highlight" id="scoreDisplay">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="label">命中</span>
+                <span class="value green" id="hitDisplay">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="label">失误</span>
+                <span class="value red" id="missDisplay">0</span>
+            </div>
+            <div class="hud-item">
+                <span class="label">准确率</span>
+                <span class="value orange" id="accDisplay">0%</span>
+            </div>
+        </div>
+        <div class="hud-right">
+            <div class="mode-switch" id="modeSwitch">
+                <button class="mode-btn active" data-mode="static">🎯 静态靶</button>
+                <button class="mode-btn" data-mode="tracking">🎯 跟枪训练</button>
+                <button class="mode-btn" data-mode="speed">⚡ 快速反应</button>
+            </div>
+            <div class="hud-item">
+                <span class="label">时间</span>
+                <span class="value" id="timerDisplay">30s</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 模式提示 -->
+    <div class="mode-hint" id="modeHint">点击出现的靶子进行射击训练</div>
+
+    <!-- Canvas -->
+    <canvas id="gameCanvas" width="1000" height="600"></canvas>
+
+    <!-- 底部控制 -->
+    <div class="controls">
+        <div class="controls-left">
+            <button class="ctrl-btn start" id="startBtn">▶ 开始训练</button>
+            <div class="difficulty">
+                <span>难度</span>
+                <button class="diff-btn" data-diff="easy">简单</button>
+                <button class="diff-btn active" data-diff="normal">普通</button>
+                <button class="diff-btn" data-diff="hard">困难</button>
+                <button class="diff-btn" data-diff="expert">专家</button>
+            </div>
+        </div>
+        <div>
+            <button class="ctrl-btn" id="resetBtn">↻ 重置</button>
+        </div>
+    </div>
+
+    <!-- 结束遮罩 -->
+    <div class="game-over-overlay" id="gameOverOverlay">
+        <div class="game-over-box">
+            <h2>🏆 训练结束</h2>
+            <div class="stats-grid" id="finalStats">
+                <div class="stat-row"><span>总得分</span><span class="sv gold" id="finalScore">0</span></div>
+                <div class="stat-row"><span>命中数</span><span class="sv" id="finalHits">0</span></div>
+                <div class="stat-row"><span>失误数</span><span class="sv" id="finalMisses">0</span></div>
+                <div class="stat-row"><span>准确率</span><span class="sv" id="finalAcc">0%</span></div>
+                <div class="stat-row"><span>最高连击</span><span class="sv" id="finalStreak">0</span></div>
+                <div class="stat-row"><span>模式</span><span class="sv" id="finalMode">-</span></div>
+            </div>
+            <button class="restart-btn" id="restartBtn">再来一轮</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- DOM ----------
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const hitDisplay = document.getElementById('hitDisplay');
+        const missDisplay = document.getElementById('missDisplay');
+        const accDisplay = document.getElementById('accDisplay');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const modeHint = document.getElementById('modeHint');
+        const modeBtns = document.querySelectorAll('.mode-btn');
+        const diffBtns = document.querySelectorAll('.diff-btn');
+
+        const finalScore = document.getElementById('finalScore');
+        const finalHits = document.getElementById('finalHits');
+        const finalMisses = document.getElementById('finalMisses');
+        const finalAcc = document.getElementById('finalAcc');
+        const finalStreak = document.getElementById('finalStreak');
+        const finalMode = document.getElementById('finalMode');
+
+        // ---------- 状态 ----------
+        const W = 1000, H = 600;
+
+        let mode = 'static';        // static | tracking | speed
+        let difficulty = 'normal';  // easy | normal | hard | expert
+        let running = false;
+        let gameOver = false;
+
+        // 统计
+        let score = 0;
+        let hits = 0;
+        let misses = 0;
+        let streak = 0;
+        let maxStreak = 0;
+        let totalShots = 0;
+
+        // 时间
+        let timeLeft = 30;
+        let maxTime = 30;
+        let lastTimestamp = 0;
+
+        // 靶子
+        let targets = [];
+        let targetIdCounter = 0;
+
+        // 鼠标
+        let mouseX = W / 2, mouseY = H / 2;
+        let mouseInside = false;
+
+        // 粒子特效
+        let particles = [];
+
+        // 跟枪模式专用
+        let trackingTarget = null;
+        let trackingActive = false;
+
+        // 快速反应
+        let speedSpawnTimer = 0;
+        let speedTargetLifetime = 0;
+
+        // ---------- 难度配置 ----------
+        const diffConfig = {
+            easy: {
+                targetRadius: 28,
+                spawnInterval: 1200,
+                maxTargets: 3,
+                speedMultiplier: 0.6,
+                trackingSpeed: 1.2,
+                time: 40,
+                speedLifetime: 1200,
+            },
+            normal: {
+                targetRadius: 22,
+                spawnInterval: 900,
+                maxTargets: 5,
+                speedMultiplier: 0.8,
+                trackingSpeed: 2.0,
+                time: 30,
+                speedLifetime: 900,
+            },
+            hard: {
+                targetRadius: 16,
+                spawnInterval: 700,
+                maxTargets: 7,
+                speedMultiplier: 1.0,
+                trackingSpeed: 3.0,
+                time: 25,
+                speedLifetime: 700,
+            },
+            expert: {
+                targetRadius: 12,
+                spawnInterval: 500,
+                maxTargets: 10,
+                speedMultiplier: 1.3,
+                trackingSpeed: 4.5,
+                time: 20,
+                speedLifetime: 500,
+            }
+        };
+
+        let config = diffConfig.normal;
+
+        // ---------- 工具函数 ----------
+        function rand(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function clamp(v, min, max) {
+            return Math.max(min, Math.min(max, v));
+        }
+
+        function dist(x1, y1, x2, y2) {
+            return Math.hypot(x2 - x1, y2 - y1);
+        }
+
+        // ---------- 粒子系统 ----------
+        function spawnParticles(x, y, color, count = 20) {
+            for (let i = 0; i < count; i++) {
+                const angle = rand(0, Math.PI * 2);
+                const speed = rand(2, 8);
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: rand(0.01, 0.03),
+                    radius: rand(2, 6),
+                    color: color,
+                });
+            }
+        }
+
+        function spawnHitMark(x, y) {
+            spawnParticles(x, y, '#4af', 25);
+            spawnParticles(x, y, '#fff', 8);
+        }
+
+        function spawnMissMark(x, y) {
+            spawnParticles(x, y, '#f55', 12);
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.96;
+                p.vy *= 0.96;
+                p.life -= p.decay;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function drawParticles() {
+            for (const p of particles) {
+                const alpha = p.life;
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius * p.life, 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        // ---------- 靶子 ----------
+        function createTarget(x, y, radius) {
+            const r = radius || config.targetRadius;
+            return {
+                id: targetIdCounter++,
+                x: x || rand(r, W - r),
+                y: y || rand(r, H - r),
+                radius: r,
+                vx: 0,
+                vy: 0,
+                life: 1,
+                alive: true,
+                spawnTime: Date.now(),
+                opacity: 0,
+                pulse: rand(0, Math.PI * 2),
+                type: 'normal',
+            };
+        }
+
+        function spawnTarget() {
+            const r = config.targetRadius;
+            let x, y, attempts = 0;
+            do {
+                x = rand(r + 10, W - r - 10);
+                y = rand(r + 10, H - r - 10);
+                attempts++;
+            } while (attempts < 20 && targets.some(t => t.alive && dist(t.x, t.y, x, y) < r * 4));
+
+            const t = createTarget(x, y);
+            targets.push(t);
+        }
+
+        function removeTarget(target) {
+            target.alive = false;
+            target.opacity = 0;
+            // 从数组中移除
+            const idx = targets.indexOf(target);
+            if (idx !== -1) targets.splice(idx, 1);
+        }
+
+        // ---------- 跟枪模式 ----------
+        function spawnTrackingTarget() {
+            if (trackingTarget) return;
+            const r = config.targetRadius * 1.5;
+            const x = rand(r, W - r);
+            const y = rand(r, H - r);
+            const t = createTarget(x, y, r);
+            t.type = 'tracking';
+            const angle = rand(0, Math.PI * 2);
+            const speed = config.trackingSpeed;
+            t.vx = Math.cos(angle) * speed;
+            t.vy = Math.sin(angle) * speed;
+            targets.push(t);
+            trackingTarget = t;
+            trackingActive = true;
+        }
+
+        function updateTrackingTarget() {
+            if (!trackingTarget || !trackingTarget.alive) {
+                trackingTarget = null;
+                trackingActive = false;
+                return;
+            }
+            const t = trackingTarget;
+            // 反弹
+            if (t.x - t.radius < 0 || t.x + t.radius > W) t.vx *= -1;
+            if (t.y - t.radius < 0 || t.y + t.radius > H) t.vy *= -1;
+            t.x = clamp(t.x + t.vx, t.radius, W - t.radius);
+            t.y = clamp(t.y + t.vy, t.radius, H - t.radius);
+
+            // 偶尔改变方向
+            if (Math.random() < 0.01) {
+                const angle = rand(0, Math.PI * 2);
+                const speed = config.trackingSpeed;
+                t.vx = Math.cos(angle) * speed;
+                t.vy = Math.sin(angle) * speed;
+            }
+        }
+
+        // ---------- 快速反应 ----------
+        function speedModeUpdate() {
+            if (!running || mode !== 'speed') return;
+            speedSpawnTimer -= 16;
+            if (speedSpawnTimer <= 0) {
+                speedSpawnTimer = config.spawnInterval;
+                // 生成多个靶子
+                const count = difficulty === 'easy' ? 1 : difficulty === 'normal' ? 2 : difficulty === 'hard' ? 3 : 4;
+                for (let i = 0; i < count; i++) {
+                    if (targets.length < config.maxTargets) {
+                        const t = createTarget();
+                        t.type = 'speed';
+                        t.lifetime = config.speedLifetime;
+                        targets.push(t);
+                    }
+                }
+            }
+
+            // 更新存活时间
+            for (const t of targets) {
+                if (t.type === 'speed' && t.alive) {
+                    t.lifetime -= 16;
+                    if (t.lifetime <= 0) {
+                        // 时间到算miss
+                        if (t.alive) {
+                            misses++;
+                            streak = 0;
+                            totalShots++;
+                            updateStats();
+                            spawnMissMark(t.x, t.y);
+                        }
+                        removeTarget(t);
+                    }
+                }
+            }
+        }
+
+        // ---------- 静态模式 ----------
+        let staticSpawnTimer = 0;
+
+        function staticModeUpdate() {
+            if (!running || mode !== 'static') return;
+            staticSpawnTimer -= 16;
+            if (staticSpawnTimer <= 0) {
+                staticSpawnTimer = config.spawnInterval;
+                if (targets.length < config.maxTargets) {
+                    spawnTarget();
+                }
+            }
+        }
+
+        // ---------- 核心游戏循环 ----------
+        function gameLoop(timestamp) {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const delta = Math.min(timestamp - lastTimestamp, 50);
+            lastTimestamp = timestamp;
+
+            // 更新计时器
+            if (running && !gameOver) {
+                timeLeft -= delta / 1000;
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    endGame();
+                }
+                timerDisplay.textContent = Math.ceil(timeLeft) + 's';
+            }
+
+            // 模式更新
+            if (running && !gameOver) {
+                if (mode === 'static') staticModeUpdate();
+                else if (mode === 'tracking') {
+                    if (!trackingTarget || !trackingTarget.alive) {
+                        spawnTrackingTarget();
+                    }
+                    updateTrackingTarget();
+                } else if (mode === 'speed') {
+                    speedModeUpdate();
+                }
+            }
+
+            // 粒子更新
+            updateParticles();
+
+            // 靶子淡入
+            for (const t of targets) {
+                if (t.opacity < 1) t.opacity = Math.min(1, t.opacity + 0.05);
+                if (t.pulse !== undefined) t.pulse += 0.04;
+            }
+
+            // 绘制
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ---------- 绘制 ----------
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+
+            // 背景网格
+            ctx.strokeStyle = '#1a1a2a';
+            ctx.lineWidth = 1;
+            for (let x = 0; x <= W; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, H);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= H; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(W, y);
+                ctx.stroke();
+            }
+
+            // 中心十字
+            ctx.strokeStyle = '#2a2a4a';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 8]);
+            ctx.beginPath();
+            ctx.moveTo(W / 2, 0);
+            ctx.lineTo(W / 2, H);
+            ctx.moveTo(0, H / 2);
+            ctx.lineTo(W, H / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 粒子
+            drawParticles();
+
+            // 靶子
+            for (const t of targets) {
+                if (!t.alive) continue;
+                const r = t.radius;
+                const pulse = Math.sin(t.pulse || 0) * 0.08 + 1;
+
+                ctx.save();
+                ctx.globalAlpha = t.opacity;
+
+                // 外圈光晕
+                const grad = ctx.createRadialGradient(t.x, t.y, r * 0.2, t.x, t.y, r * 2.5);
+                const color = t.type === 'tracking' ? 'rgba(255,170,68,0.08)' :
+                              t.type === 'speed' ? 'rgba(255,68,68,0.1)' :
+                              'rgba(68,170,255,0.08)';
+                grad.addColorStop(0, color);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, r * 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 外圈
+                const ringColor = t.type === 'tracking' ? '#fa6' :
+                                  t.type === 'speed' ? '#f66' :
+                                  '#4af';
+                ctx.strokeStyle = ringColor;
+                ctx.lineWidth = 3;
+                ctx.shadowColor = ringColor;
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, r * pulse, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+
+                // 第二圈
+                ctx.strokeStyle = ringColor;
+                ctx.globalAlpha = t.opacity * 0.3;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, r * pulse * 1.4, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 填充
+                ctx.globalAlpha = t.opacity * 0.7;
+                const fillGrad = ctx.createRadialGradient(t.x - r * 0.3, t.y - r * 0.3, 0, t.x, t.y, r);
+                fillGrad.addColorStop(0, t.type === 'tracking' ? '#fc8' : t.type === 'speed' ? '#f88' : '#8cf');
+                fillGrad.addColorStop(0.5, t.type === 'tracking' ? '#fa6' : t.type === 'speed' ? '#f66' : '#4af');
+                fillGrad.addColorStop(1, t.type === 'tracking' ? '#d84' : t.type === 'speed' ? '#d44' : '#28a');
+                ctx.fillStyle = fillGrad;
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, r * pulse * 0.85, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 中心点
+                ctx.globalAlpha = t.opacity * 0.9;
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, r * 0.18 * pulse, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 十字准心
+                ctx.globalAlpha = t.opacity * 0.4;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 1.5;
+                const cSize = r * 0.5;
+                ctx.beginPath();
+                ctx.moveTo(t.x - cSize, t.y);
+                ctx.lineTo(t.x + cSize, t.y);
+                ctx.moveTo(t.x, t.y - cSize);
+                ctx.lineTo(t.x, t.y + cSize);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // ---------- 自定义鼠标准心 ----------
+            if (mouseInside) {
+                const cx = mouseX, cy = mouseY;
+                ctx.save();
+
+                // 外圈
+                ctx.strokeStyle = 'rgba(68,170,255,0.6)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 十字线
+                const gap = 6, len = 18;
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = 2;
+                ctx.shadowColor = 'rgba(68,170,255,0.3)';
+                ctx.shadowBlur = 8;
+
+                ctx.beginPath();
+                ctx.moveTo(cx - len - gap, cy);
+                ctx.lineTo(cx - gap, cy);
+                ctx.moveTo(cx + gap, cy);
+                ctx.lineTo(cx + len + gap, cy);
+                ctx.moveTo(cx, cy - len - gap);
+                ctx.lineTo(cx, cy - gap);
+                ctx.moveTo(cx, cy + gap);
+                ctx.lineTo(cx, cy + len + gap);
+                ctx.stroke();
+
+                // 中心红点
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#f44';
+                ctx.beginPath();
+                ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            // 模式提示
+            if (!running && !gameOver) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(100,100,140,0.3)';
+                ctx.font = '24px "Segoe UI", Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('点击「开始训练」进入练习', W / 2, H / 2 + 60);
+                ctx.restore();
+            }
+
+            // 跟枪模式提示目标
+            if (running && mode === 'tracking' && trackingTarget && trackingTarget.alive) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(255,170,68,0.4)';
+                ctx.font = '14px "Segoe UI", Arial, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('← 跟住移动靶射击 →', W / 2, 30);
+                ctx.restore();
+            }
+        }
+
+        // ---------- 射击处理 ----------
+        function handleShot(x, y) {
+            if (!running || gameOver) return;
+
+            let hit = false;
+            // 从后往前遍历（上层靶子优先）
+            for (let i = targets.length - 1; i >= 0; i--) {
+                const t = targets[i];
+                if (!t.alive) continue;
+                const d = dist(x, y, t.x, t.y);
+                const r = t.radius * (Math.sin(t.pulse || 0) * 0.08 + 1) * 0.85;
+                if (d <= r) {
+                    // 命中
+                    hits++;
+                    score += t.type === 'tracking' ? 3 : t.type === 'speed' ? 2 : 1;
+                    streak++;
+                    if (streak > maxStreak) maxStreak = streak;
+                    totalShots++;
+                    hit = true;
+
+                    spawnHitMark(t.x, t.y);
+
+                    // 连击提示
+                    if (streak >= 5 && streak % 5 === 0) {
+                        spawnParticles(t.x, t.y, '#fd0', 30);
+                    }
+
+                    removeTarget(t);
+
+                    if (t === trackingTarget) {
+                        trackingTarget = null;
+                        trackingActive = false;
+                    }
+                    break;
+                }
+            }
+
+            if (!hit) {
+                // 未命中
+                misses++;
+                streak = 0;
+                totalShots++;
+                spawnMissMark(x, y);
+            }
+
+            updateStats();
+        }
+
+        // ---------- 更新统计显示 ----------
+        function updateStats() {
+            scoreDisplay.textContent = score;
+            hitDisplay.textContent = hits;
+            missDisplay.textContent = misses;
+            const acc = totalShots > 0 ? Math.round((hits / totalShots) * 100) : 0;
+            accDisplay.textContent = acc + '%';
+        }
+
+        // ---------- 开始/结束 ----------
+        function startGame() {
+            if (running) return;
+            resetGame();
+            running = true;
+            gameOver = false;
+            gameOverOverlay.classList.remove('show');
+            startBtn.textContent = '⏹ 训练中...';
+            startBtn.classList.remove('start');
+            startBtn.classList.add('stop');
+            timeLeft = config.time;
+            maxTime = config.time;
+            timerDisplay.textContent = timeLeft + 's';
+            lastTimestamp = 0;
+
+            if (mode === 'static') {
+                staticSpawnTimer = 0;
+                // 初始生成几个靶
+                for (let i = 0; i < Math.min(3, config.maxTargets); i++) spawnTarget();
+            } else if (mode === 'tracking') {
+                spawnTrackingTarget();
+            } else if (mode === 'speed') {
+                speedSpawnTimer = 500;
+            }
+        }
+
+        function endGame() {
+            running = false;
+            gameOver = true;
+            startBtn.textContent = '▶ 开始训练';
+            startBtn.classList.remove('stop');
+            startBtn.classList.add('start');
+            timerDisplay.textContent = '0s';
+
+            // 清理所有靶子
+            targets = [];
+            trackingTarget = null;
+
+            // 显示结算
+            const acc = totalShots > 0 ? Math.round((hits / totalShots) * 100) : 0;
+            finalScore.textContent = score;
+            finalHits.textContent = hits;
+            finalMisses.textContent = misses;
+            finalAcc.textContent = acc + '%';
+            finalStreak.textContent = maxStreak;
+            const modeNames = { static: '静态靶', tracking: '跟枪训练', speed: '快速反应' };
+            finalMode.textContent = modeNames[mode] || mode;
+            gameOverOverlay.classList.add('show');
+        }
+
+        function resetGame() {
+            running = false;
+            gameOver = false;
+            gameOverOverlay.classList.remove('show');
+            score = 0;
+            hits = 0;
+            misses = 0;
+            streak = 0;
+            maxStreak = 0;
+            totalShots = 0;
+            targets = [];
+            particles = [];
+            trackingTarget = null;
+            trackingActive = false;
+            timeLeft = config.time;
+            timerDisplay.textContent = (config.time || 30) + 's';
+            startBtn.textContent = '▶ 开始训练';
+            startBtn.classList.remove('stop');
+            startBtn.classList.add('start');
+            updateStats();
+        }
+
+        // ---------- 事件绑定 ----------
+        // 鼠标移动
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            mouseX = (e.clientX - rect.left) * scaleX;
+            mouseY = (e.clientY - rect.top) * scaleY;
+            mouseInside = true;
+        });
+
+        canvas.addEventListener('mouseenter', () => { mouseInside = true; });
+        canvas.addEventListener('mouseleave', () => { mouseInside = false; });
+
+        // 点击射击
+        canvas.addEventListener('click', (e) => {
+            if (!running || gameOver) return;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+            handleShot(x, y);
+        });
+
+        // 开始按钮
+        startBtn.addEventListener('click', () => {
+            if (gameOver) {
+                resetGame();
+                startGame();
+            } else if (running) {
+                // 停止
+                running = false;
+                gameOver = true;
+                endGame();
+            } else {
+                startGame();
+            }
+        });
+
+        // 重置
+        resetBtn.addEventListener('click', resetGame);
+        restartBtn.addEventListener('click', () => {
+            resetGame();
+            startGame();
+        });
+
+        // 模式切换
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (running) return;
+                modeBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                mode = btn.dataset.mode;
+                resetGame();
+                const hints = {
+                    static: '点击出现的靶子进行射击训练 · 靶子会不断刷新',
+                    tracking: '追踪并射击移动的靶子 · 命中得3分',
+                    speed: '在靶子消失前快速射击 · 考验反应速度'
+                };
+                modeHint.textContent = hints[mode] || '';
+            });
+        });
+
+        // 难度切换
+        diffBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (running) return;
+                diffBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                difficulty = btn.dataset.diff;
+                config = diffConfig[difficulty];
+                resetGame();
+            });
+        });
+
+        // ---------- 初始化 ----------
+        config = diffConfig.normal;
+        resetGame();
+        modeHint.textContent = '点击出现的靶子进行射击训练 · 靶子会不断刷新';
+
+        // 启动游戏循环
+        requestAnimationFrame(gameLoop);
+
+        // 窗口自适应
+        function resizeCanvas() {
+            const container = document.querySelector('.game-container');
+            const maxW = window.innerWidth - 40;
+            const maxH = window.innerHeight - 40;
+            const aspect = 1000 / 600;
+            let w = Math.min(1000, maxW);
+            let h = w / aspect;
+            if (h > maxH) {
+                h = maxH;
+                w = h * aspect;
+            }
+            canvas.style.width = w + 'px';
+            canvas.style.height = h + 'px';
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        console.log('🎯 FPS 练枪场已加载！');
+        console.log('模式: 静态靶/跟枪训练/快速反应 | 难度: 简单~专家');
+    })();
+</script>
+
+</body>
+</html>
