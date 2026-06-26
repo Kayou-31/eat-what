@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>反应速度测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f5f7fa;
+            user-select: none;
+            color: #1e293b;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 30px;
+            padding: 20px;
+        }
+
+        h1 {
+            font-weight: 600;
+            font-size: 1.6rem;
+            letter-spacing: 1px;
+            color: #334155;
+        }
+        h1 span {
+            margin-right: 6px;
+        }
+
+        .test-area {
+            width: 420px;
+            height: 280px;
+            border-radius: 28px;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.3s ease;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            border: 2px solid #e2e8f0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .test-area:active {
+            transform: scale(0.97);
+        }
+
+        .test-area.idle {
+            background: #ffffff;
+            border-color: #e2e8f0;
+        }
+        .test-area.idle:hover {
+            border-color: #94a3b8;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+
+        .test-area.waiting {
+            background: #fee2e2;
+            border-color: #f87171;
+        }
+
+        .test-area.ready {
+            background: #dcfce7;
+            border-color: #4ade80;
+        }
+
+        .test-area .text {
+            font-size: 1.5rem;
+            color: #1e293b;
+            font-weight: 500;
+            text-align: center;
+            padding: 24px;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .test-area .text .sub {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 400;
+            color: #94a3b8;
+            margin-top: 10px;
+        }
+
+        .test-area.waiting .text,
+        .test-area.ready .text {
+            color: #1e293b;
+        }
+        .test-area.waiting .text .sub {
+            color: #f87171;
+        }
+        .test-area.ready .text .sub {
+            color: #22c55e;
+        }
+
+        .test-area .hint-dot {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #cbd5e1;
+            transition: background 0.2s ease, box-shadow 0.2s ease;
+        }
+        .test-area.waiting .hint-dot {
+            background: #ef4444;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+        }
+        .test-area.ready .hint-dot {
+            background: #22c55e;
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+        }
+
+        /* ── 结果弹窗（含段位） ── */
+        .result-popup {
+            position: fixed;
+            top: 28px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-20px);
+            background: #ffffff;
+            color: #1e293b;
+            padding: 18px 44px;
+            border-radius: 60px;
+            font-size: 1.8rem;
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            pointer-events: none;
+            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.12);
+            border: 1px solid #e2e8f0;
+            z-index: 10;
+            text-align: center;
+            line-height: 1.4;
+        }
+        .result-popup.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .result-popup .time {
+            font-size: 2rem;
+        }
+        .result-popup .unit {
+            font-size: 1rem;
+            font-weight: 400;
+            color: #94a3b8;
+            margin-left: 4px;
+        }
+        .result-popup .rank {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        /* 统计区 */
+        .stats {
+            display: flex;
+            gap: 48px;
+            padding: 20px 40px;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+            border: 1px solid #f1f5f9;
+        }
+
+        .stats .stat-item {
+            text-align: center;
+            min-width: 64px;
+        }
+
+        .stats .stat-item .value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.5px;
+        }
+
+        .stats .stat-item .label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .stats .stat-item .value.best {
+            color: #16a34a;
+        }
+        .stats .stat-item .value.avg {
+            color: #2563eb;
+        }
+        .stats .stat-item .value.count {
+            color: #64748b;
+        }
+
+        /* 底部 */
+        .bottom-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 14px;
+        }
+
+        .controls button {
+            padding: 10px 30px;
+            border: none;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+
+        .controls button:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+            border-color: #cbd5e1;
+        }
+
+        .controls button:active {
+            transform: scale(0.95);
+        }
+
+        .history-label {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            min-height: 1.4em;
+        }
+
+        .bottom-area .hint-key {
+            color: #cbd5e1;
+            font-size: 0.75rem;
+        }
+
+        /* 段位参考表 */
+        .rank-table-toggle {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            cursor: pointer;
+            border-bottom: 1px dashed #d1d5db;
+            transition: color 0.2s;
+        }
+        .rank-table-toggle:hover {
+            color: #475569;
+        }
+
+        .rank-table {
+            display: none;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 16px 24px;
+            box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+            border: 1px solid #f1f5f9;
+            margin-top: 4px;
+            width: 100%;
+            max-width: 420px;
+        }
+        .rank-table.show {
+            display: block;
+        }
+
+        .rank-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+        }
+        .rank-table th {
+            text-align: left;
+            color: #94a3b8;
+            font-weight: 500;
+            padding-bottom: 6px;
+            font-size: 0.75rem;
+            letter-spacing: 0.5px;
+        }
+        .rank-table td {
+            padding: 5px 0;
+            border-bottom: 1px solid #f8fafc;
+        }
+        .rank-table td:first-child {
+            color: #475569;
+            font-weight: 500;
+            width: 100px;
+        }
+        .rank-table td:last-child {
+            color: #0f172a;
+        }
+        .rank-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        @media (max-width: 520px) {
+            .test-area {
+                width: 90vw;
+                height: 220px;
+            }
+            .stats {
+                gap: 16px;
+                padding: 16px 20px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .stats .stat-item .value {
+                font-size: 1.4rem;
+            }
+            .stats .stat-item {
+                min-width: 50px;
+            }
+            h1 {
+                font-size: 1.3rem;
+            }
+            .result-popup {
+                font-size: 1.4rem;
+                padding: 14px 28px;
+            }
+            .result-popup .time {
+                font-size: 1.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1><span>⚡</span>反应速度测试</h1>
+
+    <!-- 测试区域 -->
+    <div class="test-area idle" id="testArea">
+        <div class="text" id="testText">
+            点击开始测试
+            <span class="sub">等待绿色后尽快点击 👇</span>
+        </div>
+        <div class="hint-dot"></div>
+    </div>
+
+    <!-- 统计 -->
+    <div class="stats">
+        <div class="stat-item">
+            <div class="value" id="lastTime">—</div>
+            <div class="label">上次</div>
+        </div>
+        <div class="stat-item">
+            <div class="value best" id="bestTime">—</div>
+            <div class="label">最快</div>
+        </div>
+        <div class="stat-item">
+            <div class="value avg" id="avgTime">—</div>
+            <div class="label">平均</div>
+        </div>
+        <div class="stat-item">
+            <div class="value count" id="count">0</div>
+            <div class="label">次数</div>
+        </div>
+    </div>
+
+    <!-- 底部 -->
+    <div class="bottom-area">
+        <div class="controls">
+            <button id="resetBtn">🔄 重置数据</button>
+        </div>
+        <div class="history-label" id="historyLabel"></div>
+        <div class="hint-key">空格 / 回车 也可操作</div>
+
+        <!-- 段位表 -->
+        <span class="rank-table-toggle" id="rankToggle">📊 查看段位标准</span>
+        <div class="rank-table" id="rankTable">
+            <table>
+                <tr><th>时间</th><th>段位</th></tr>
+                <tr><td>≤ 100 ms</td><td>😏 预判点击</td></tr>
+                <tr><td>100 ~ 150 ms</td><td>🏆 职业选手 / 专业运动员</td></tr>
+                <tr><td>150 ~ 200 ms</td><td>🚀 反应非常快</td></tr>
+                <tr><td>200 ~ 250 ms</td><td>👍 反应较快</td></tr>
+                <tr><td>250 ~ 300 ms</td><td>👌 正常水平</td></tr>
+                <tr><td>300 ~ 400 ms</td><td>🐢 稍慢了</td></tr>
+                <tr><td>400 ~ 1000 ms</td><td>😅 需要多练练</td></tr>
+                <tr><td>≥ 1000 ms</td><td>😴 你睡着了吗</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 浮动结果（含段位） -->
+<div class="result-popup" id="resultPopup">
+    <span class="time">0</span><span class="unit">ms</span>
+    <span class="rank" id="rankText"></span>
+</div>
+
+<script>
+    (function() {
+        // --- DOM ---
+        const area = document.getElementById('testArea');
+        const text = document.getElementById('testText');
+        const lastTimeEl = document.getElementById('lastTime');
+        const bestTimeEl = document.getElementById('bestTime');
+        const avgTimeEl = document.getElementById('avgTime');
+        const countEl = document.getElementById('count');
+        const resultPopup = document.getElementById('resultPopup');
+        const rankText = document.getElementById('rankText');
+        const historyLabel = document.getElementById('historyLabel');
+        const resetBtn = document.getElementById('resetBtn');
+        const rankToggle = document.getElementById('rankToggle');
+        const rankTable = document.getElementById('rankTable');
+
+        // --- 状态 ---
+        const STATE = { IDLE: 'idle', WAITING: 'waiting', READY: 'ready' };
+
+        let state = STATE.IDLE;
+        let readyTimestamp = 0;
+        let timeoutId = null;
+        let isProcessing = false;
+
+        // --- 数据 ---
+        let results = [];
+        let best = Infinity;
+        let last = null;
+
+        // --- 段位判定 ---
+        function getRank(ms) {
+            if (ms <= 100)   return { text: '😏 预判点击',      color: '#dc2626' };
+            if (ms <= 150)   return { text: '🏆 职业选手 / 专业运动员', color: '#16a34a' };
+            if (ms <= 200)   return { text: '🚀 反应非常快',    color: '#16a34a' };
+            if (ms <= 250)   return { text: '👍 反应较快',      color: '#2563eb' };
+            if (ms <= 300)   return { text: '👌 正常水平',      color: '#6b7280' };
+            if (ms <= 400)   return { text: '🐢 稍慢了',        color: '#d97706' };
+            if (ms <= 1000)  return { text: '😅 需要多练练',    color: '#d97706' };
+            return { text: '😴 你睡着了吗', color: '#dc2626' };
+        }
+
+        function randomDelay() {
+            return 1000 + Math.random() * 4000;
+        }
+
+        // --- 设置状态 ---
+        function setState(newState) {
+            state = newState;
+            area.className = 'test-area ' + state;
+
+            switch (state) {
+                case STATE.IDLE:
+                    text.innerHTML = '点击开始测试<span class="sub">等待绿色后尽快点击 👇</span>';
+                    break;
+                case STATE.WAITING:
+                    text.innerHTML = '⏳ 等待…<span class="sub">稳住，等变绿色再点！</span>';
+                    break;
+                case STATE.READY:
+                    text.innerHTML = '🟢 点击！<span class="sub">快！立刻点击！</span>';
+                    break;
+            }
+        }
+
+        // --- 弹出结果 + 段位 ---
+        function showPopup(ms) {
+            const rank = getRank(ms);
+            const popup = resultPopup;
+            popup.style.color = rank.color;
+            popup.querySelector('.time').textContent = ms;
+            rankText.textContent = rank.text;
+            rankText.style.color = rank.color;
+            popup.classList.add('show');
+            clearTimeout(popup._hideTimer);
+            popup._hideTimer = setTimeout(() => popup.classList.remove('show'), 1800);
+        }
+
+        // --- 更新统计 ---
+        function updateStats() {
+            const n = results.length;
+            countEl.textContent = n;
+            lastTimeEl.textContent = last !== null ? last : '—';
+
+            if (n === 0) {
+                bestTimeEl.textContent = '—';
+                avgTimeEl.textContent = '—';
+                historyLabel.textContent = '';
+                return;
+            }
+
+            best = Math.min(...results);
+            bestTimeEl.textContent = best;
+
+            const sum = results.reduce((a, b) => a + b, 0);
+            avgTimeEl.textContent = Math.round(sum / n);
+
+            const recent = results.slice(-5).reverse();
+            historyLabel.textContent = '最近 5 次：' + recent.join(' · ');
+        }
+
+        // --- 开始一轮 ---
+        function startRound() {
+            if (isProcessing) return;
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            setState(STATE.WAITING);
+
+            const delay = randomDelay();
+            timeoutId = setTimeout(() => {
+                setState(STATE.READY);
+                readyTimestamp = performance.now();
+                timeoutId = null;
+            }, delay);
+        }
+
+        // --- 点击逻辑 ---
+        function handleAction(e) {
+            if (e) e.preventDefault();
+            if (isProcessing) return;
+
+            if (state === STATE.IDLE) {
+                startRound();
+                return;
+            }
+
+            if (state === STATE.WAITING) {
+                isProcessing = true;
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    timeoutId = null;
+                }
+                text.innerHTML = '❌ 操之过急！<span class="sub">等变绿再点，点击重新开始</span>';
+                area.className = 'test-area idle';
+                area.style.borderColor = '#f87171';
+                setTimeout(() => {
+                    area.style.borderColor = '';
+                    setState(STATE.IDLE);
+                    isProcessing = false;
+                }, 900);
+                return;
+            }
+
+            if (state === STATE.READY) {
+                isProcessing = true;
+                const now = performance.now();
+                const reactionTime = Math.round(now - readyTimestamp);
+
+                results.push(reactionTime);
+                last = reactionTime;
+                updateStats();
+                showPopup(reactionTime);
+
+                setState(STATE.IDLE);
+                setTimeout(() => { isProcessing = false; }, 400);
+                return;
+            }
+        }
+
+        // --- 重置 ---
+        function resetAll() {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            results = [];
+            best = Infinity;
+            last = null;
+            isProcessing = false;
+            updateStats();
+            setState(STATE.IDLE);
+            resultPopup.classList.remove('show');
+            historyLabel.textContent = '';
+            lastTimeEl.textContent = '—';
+        }
+
+        // --- 段位表折叠 ---
+        rankToggle.addEventListener('click', () => {
+            rankTable.classList.toggle('show');
+            rankToggle.textContent = rankTable.classList.contains('show')
+                ? '📊 收起段位标准'
+                : '📊 查看段位标准';
+        });
+
+        // --- 事件绑定 ---
+        area.addEventListener('click', handleAction);
+        area.addEventListener('touchstart', handleAction, { passive: false });
+        resetBtn.addEventListener('click', resetAll);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                handleAction(e);
+            }
+        });
+
+        // --- 初始化 ---
+        setState(STATE.IDLE);
+        updateStats();
+    })();
+</script>
+
+</body>
+</html>
