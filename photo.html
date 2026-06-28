@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>照片位置信息清除工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f5f5f7;
+            display: flex;
+            justify-content: center;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 640px;
+            width: 100%;
+            background: #fff;
+            border-radius: 20px;
+            padding: 32px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            align-self: flex-start;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1d1d1f;
+        }
+        .subtitle {
+            color: #86868b;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        .upload-area {
+            border: 2px dashed #d2d2d7;
+            border-radius: 14px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover {
+            border-color: #007aff;
+            background: #f0f7ff;
+        }
+        .upload-area.dragover {
+            border-color: #007aff;
+            background: #e8f0fe;
+        }
+        .upload-area .icon {
+            font-size: 42px;
+            margin-bottom: 12px;
+        }
+        .upload-area p {
+            color: #6e6e73;
+            font-size: 14px;
+        }
+        .upload-area .hint {
+            font-size: 12px;
+            color: #aeaeb2;
+            margin-top: 8px;
+        }
+        .preview-section {
+            display: none;
+            margin-bottom: 20px;
+        }
+        .preview-section.show {
+            display: block;
+        }
+        .preview-img {
+            width: 100%;
+            max-height: 360px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: #f0f0f0;
+            margin-bottom: 16px;
+        }
+        .info-card {
+            background: #f8f8fa;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .info-card h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 10px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 13px;
+            border-bottom: 1px solid #eee;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            color: #86868b;
+        }
+        .info-value {
+            color: #1d1d1f;
+            font-weight: 500;
+            text-align: right;
+            max-width: 60%;
+            word-break: break-all;
+        }
+        .info-value.has-gps {
+            color: #e74c3c;
+        }
+        .info-value.cleared {
+            color: #34c759;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .btn-primary {
+            background: #007aff;
+            color: #fff;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: #0066d6;
+        }
+        .btn-success {
+            background: #34c759;
+            color: #fff;
+        }
+        .btn-success:hover:not(:disabled) {
+            background: #28a745;
+        }
+        .btn-secondary {
+            background: #e8e8ed;
+            color: #1d1d1f;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: #d8d8dd;
+        }
+        .toast {
+            display: none;
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .toast.success {
+            display: block;
+            background: #e8f8ee;
+            color: #1a7d36;
+        }
+        .toast.error {
+            display: block;
+            background: #fde8e8;
+            color: #c0392b;
+        }
+        .toast.info {
+            display: block;
+            background: #e8f0fe;
+            color: #0056b3;
+        }
+        .footer {
+            margin-top: 24px;
+            font-size: 12px;
+            color: #aeaeb2;
+            text-align: center;
+        }
+        .filename {
+            font-size: 13px;
+            color: #6e6e73;
+            margin-bottom: 12px;
+            word-break: break-all;
+        }
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+            .btn-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📷 照片位置清除器</h1>
+    <p class="subtitle">所有操作在浏览器本地完成，不上传任何数据到服务器</p>
+
+    <!-- 上传区域 -->
+    <div class="upload-area" id="uploadArea">
+        <div class="icon">📁</div>
+        <p><strong>点击选择照片</strong> 或拖入照片</p>
+        <p class="hint">支持 JPG / JPEG / PNG / HEIC / WebP</p>
+        <input type="file" id="fileInput" accept="image/*" style="display:none" />
+    </div>
+
+    <!-- 预览 & 操作区 -->
+    <div class="preview-section" id="previewSection">
+        <img class="preview-img" id="previewImg" alt="预览" />
+        <div class="filename" id="fileName"></div>
+
+        <div class="info-card">
+            <h3>📍 位置信息</h3>
+            <div class="info-row">
+                <span class="info-label">纬度</span>
+                <span class="info-value" id="infoLat">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">经度</span>
+                <span class="info-value" id="infoLng">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">拍摄地点</span>
+                <span class="info-value" id="infoAddress">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">状态</span>
+                <span class="info-value" id="infoStatus">待检查</span>
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" id="btnClear">🧹 清除位置信息</button>
+            <button class="btn btn-success" id="btnDownload" disabled>⬇️ 下载清理后的照片</button>
+            <button class="btn btn-secondary" id="btnReset">🔄 重新选择</button>
+        </div>
+
+        <div class="toast" id="toast"></div>
+    </div>
+
+    <div class="footer">
+        所有数据处理均在浏览器本地完成，隐私安全 ✅
+    </div>
+</div>
+
+<!-- piexifjs 库：用于读写 EXIF -->
+<script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js">
+</script>
+
+<script>
+    (function() {
+        // ----- DOM 元素 -----
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const previewSection = document.getElementById('previewSection');
+        const previewImg = document.getElementById('previewImg');
+        const fileName = document.getElementById('fileName');
+        const infoLat = document.getElementById('infoLat');
+        const infoLng = document.getElementById('infoLng');
+        const infoAddress = document.getElementById('infoAddress');
+        const infoStatus = document.getElementById('infoStatus');
+        const btnClear = document.getElementById('btnClear');
+        const btnDownload = document.getElementById('btnDownload');
+        const btnReset = document.getElementById('btnReset');
+        const toast = document.getElementById('toast');
+
+        // ----- 状态 -----
+        let currentFile = null;        // 原始 File 对象
+        let originalBase64 = null;     // 原始 base64（带 EXIF）
+        let cleanedBase64 = null;      // 清理后的 base64
+        let currentExif = null;        // 原始 EXIF 对象
+        let hasGpsData = false;        // 是否有 GPS 信息
+        let isCleared = false;         // 是否已清除
+
+        // ----- 辅助函数 -----
+        function showToast(msg, type = 'info') {
+            toast.className = 'toast ' + type;
+            toast.textContent = msg;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, 4000);
+        }
+
+        function formatCoord(coord) {
+            // coord 可能是 [deg, min, sec] 或小数
+            if (!coord) return '-';
+            if (Array.isArray(coord)) {
+                const d = coord[0] || 0;
+                const m = coord[1] || 0;
+                const s = coord[2] || 0;
+                return `${d}°${m}'${s.toFixed(2)}"`;
+            }
+            if (typeof coord === 'number') {
+                return coord.toFixed(6) + '°';
+            }
+            return String(coord);
+        }
+
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // ----- 解析 EXIF 并显示信息 -----
+        function parseAndDisplay(base64Data) {
+            try {
+                // piexifjs 要求去掉 data:... 前缀
+                const binary = piexif.load(base64Data);
+                currentExif = binary;
+
+                const gps = binary.GPS || {};
+                const hasLat = gps[piexif.GPSIFD.GPSLatitude] !== undefined;
+                const hasLng = gps[piexif.GPSIFD.GPSLongitude] !== undefined;
+                const latRef = gps[piexif.GPSIFD.GPSLatitudeRef] || '';
+                const lngRef = gps[piexif.GPSIFD.GPSLongitudeRef] || '';
+
+                if (hasLat && hasLng) {
+                    hasGpsData = true;
+                    const lat = gps[piexif.GPSIFD.GPSLatitude];
+                    const lng = gps[piexif.GPSIFD.GPSLongitude];
+
+                    infoLat.textContent = formatCoord(lat) + (latRef || '');
+                    infoLng.textContent = formatCoord(lng) + (lngRef || '');
+                    infoLat.className = 'info-value has-gps';
+                    infoLng.className = 'info-value has-gps';
+
+                    // 尝试转成小数显示地址提示
+                    try {
+                        const latDec = piexif.GPS.toDecimal(lat, latRef);
+                        const lngDec = piexif.GPS.toDecimal(lng, lngRef);
+                        infoAddress.textContent = `${latDec.toFixed(4)}, ${lngDec.toFixed(4)}`;
+                    } catch(e) {
+                        infoAddress.textContent = '（可解析）';
+                    }
+
+                    infoStatus.textContent = '⚠️ 包含位置信息';
+                    infoStatus.style.color = '#e74c3c';
+                    btnClear.disabled = false;
+                    isCleared = false;
+                } else {
+                    hasGpsData = false;
+                    infoLat.textContent = '无';
+                    infoLng.textContent = '无';
+                    infoLat.className = 'info-value';
+                    infoLng.className = 'info-value';
+                    infoAddress.textContent = '无';
+                    infoStatus.textContent = '✅ 不含位置信息';
+                    infoStatus.style.color = '#34c759';
+                    btnClear.disabled = true;
+                    isCleared = true; // 已经是干净的了
+                }
+
+                // 显示其他基本信息
+                // (可选)
+
+            } catch (e) {
+                console.error('EXIF 解析失败:', e);
+                // 可能不是 JPEG 等格式
+                hasGpsData = false;
+                infoLat.textContent = '无法解析';
+                infoLng.textContent = '无法解析';
+                infoAddress.textContent = '（非标准格式）';
+                infoStatus.textContent = '⚠️ 无法读取 EXIF';
+                infoStatus.style.color = '#f39c12';
+                btnClear.disabled = true;
+            }
+        }
+
+        // ----- 清除位置信息 -----
+        function clearGpsInfo(base64Data) {
+            try {
+                const binary = piexif.load(base64Data);
+                // 删除所有 GPS 标签
+                binary.GPS = {};
+                const newData = piexif.dump(binary);
+                const newBase64 = piexif.insert(newData, base64Data);
+                return newBase64;
+            } catch (e) {
+                console.error('清除 GPS 失败:', e);
+                // 如果 piexif 处理不了，用 canvas 回退（会丢失所有 EXIF）
+                return stripAllExifViaCanvas(base64Data);
+            }
+        }
+
+        // 回退方案：通过 canvas 重绘，完全去除所有 EXIF
+        function stripAllExifViaCanvas(base64Data) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                    resolve(dataUrl);
+                };
+                img.onerror = reject;
+                img.src = base64Data;
+            });
+        }
+
+        // ----- 加载照片 -----
+        async function loadPhoto(file) {
+            currentFile = file;
+            fileName.textContent = '📄 ' + file.name;
+
+            // 读取为 base64
+            const base64 = await readFileAsBase64(file);
+            originalBase64 = base64;
+
+            // 显示预览
+            previewImg.src = base64;
+
+            // 解析并显示 EXIF
+            parseAndDisplay(base64);
+
+            // 清除之前的结果
+            cleanedBase64 = null;
+            btnDownload.disabled = true;
+            isCleared = false;
+
+            previewSection.classList.add('show');
+            toast.style.display = 'none';
+        }
+
+        // ----- 重置 -----
+        function resetAll() {
+            currentFile = null;
+            originalBase64 = null;
+            cleanedBase64 = null;
+            currentExif = null;
+            hasGpsData = false;
+            isCleared = false;
+            previewImg.src = '';
+            fileName.textContent = '';
+            infoLat.textContent = '-';
+            infoLng.textContent = '-';
+            infoAddress.textContent = '-';
+            infoStatus.textContent = '待检查';
+            infoStatus.style.color = '#86868b';
+            infoLat.className = 'info-value';
+            infoLng.className = 'info-value';
+            btnClear.disabled = false;
+            btnDownload.disabled = true;
+            toast.style.display = 'none';
+            previewSection.classList.remove('show');
+            fileInput.value = '';
+        }
+
+        // ----- 事件绑定 -----
+
+        // 点击上传区域
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadPhoto(file);
+            }
+        });
+
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadPhoto(file);
+            } else {
+                showToast('请拖入图片文件', 'error');
+            }
+        });
+
+        // 清除位置
+        btnClear.addEventListener('click', async () => {
+            if (!originalBase64 || isCleared) return;
+
+            btnClear.disabled = true;
+            btnClear.textContent = '⏳ 清除中...';
+
+            try {
+                let result = clearGpsInfo(originalBase64);
+                // 如果是 Promise（canvas 回退）
+                if (result instanceof Promise) {
+                    result = await result;
+                }
+                cleanedBase64 = result;
+
+                // 更新显示
+                infoLat.textContent = '已清除';
+                infoLng.textContent = '已清除';
+                infoAddress.textContent = '已清除';
+                infoLat.className = 'info-value cleared';
+                infoLng.className = 'info-value cleared';
+                infoStatus.textContent = '✅ 位置信息已清除';
+                infoStatus.style.color = '#34c759';
+
+                isCleared = true;
+                btnDownload.disabled = false;
+                // 预览更新为清理后的（可选）
+                previewImg.src = cleanedBase64;
+                showToast('✅ 位置信息已成功清除！', 'success');
+            } catch (e) {
+                console.error(e);
+                showToast('清除失败，请尝试其他格式', 'error');
+            } finally {
+                btnClear.disabled = false;
+                btnClear.textContent = '🧹 清除位置信息';
+            }
+        });
+
+        // 下载
+        btnDownload.addEventListener('click', () => {
+            if (!cleanedBase64 && !isCleared) return;
+
+            const dataToDownload = cleanedBase64 || originalBase64;
+            const link = document.createElement('a');
+            link.href = dataToDownload;
+
+            // 文件名处理
+            let name = '照片';
+            if (currentFile) {
+                const dotIndex = currentFile.name.lastIndexOf('.');
+                const baseName = dotIndex > 0 ? currentFile.name.substring(0, dotIndex) : currentFile.name;
+                const ext = dotIndex > 0 ? currentFile.name.substring(dotIndex) : '.jpg';
+                name = baseName + '_已清除位置' + ext;
+            } else {
+                name = '已清除位置.jpg';
+            }
+            link.download = name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            showToast('⬇️ 已保存：' + name, 'success');
+        });
+
+        // 重置
+        btnReset.addEventListener('click', resetAll);
+
+        // 额外：点击 toast 可关闭
+        toast.addEventListener('click', () => {
+            toast.style.display = 'none';
+        });
+
+        console.log('📷 照片位置清除工具已加载');
+    })();
+</script>
+
+</body>
+</html>
