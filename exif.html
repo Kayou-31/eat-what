@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>EXIF诊断工具</title></head>
+<body style="font-family:sans-serif;padding:20px;max-width:600px;margin:0 auto;">
+<h2>🔍 EXIF 诊断工具</h2>
+<p>选择照片后，会显示原始 EXIF 的全部内容</p>
+<input type="file" id="fileInput" accept="image/*" />
+<pre id="output" style="background:#f5f5f5;padding:16px;border-radius:8px;margin-top:16px;white-space:pre-wrap;word-break:break-all;font-size:13px;">等待选择照片...</pre>
+
+<script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+<script>
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const out = document.getElementById('output');
+    out.textContent = '📄 文件名: ' + file.name + '\n文件大小: ' + (file.size/1024).toFixed(1) + ' KB\n类型: ' + file.type + '\n\n正在读取...';
+    
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const base64 = ev.target.result;
+        try {
+            const exif = piexif.load(base64);
+            let text = '✅ piexifjs 加载成功\n\n';
+            text += '=== IFD0（主信息）===\n';
+            const ifd0 = exif['0th'] || {};
+            for (let k in ifd0) {
+                text += `  [${k}] => ${JSON.stringify(ifd0[k])}\n`;
+            }
+            text += '\n=== EXIF（拍摄参数）===\n';
+            const exifData = exif['Exif'] || {};
+            for (let k in exifData) {
+                text += `  [${k}] => ${JSON.stringify(exifData[k])}\n`;
+            }
+            text += '\n=== GPS（位置信息）===\n';
+            const gps = exif['GPS'] || {};
+            if (Object.keys(gps).length === 0) {
+                text += '  ❌ 完全没有任何 GPS 标签！\n';
+                text += '  ➡ 说明系统在选文件时已经把位置去掉了\n';
+            } else {
+                for (let k in gps) {
+                    text += `  [${k}] => ${JSON.stringify(gps[k])}\n`;
+                }
+                text += '\n  ✅ 找到了 GPS 信息！\n';
+            }
+            out.textContent = text;
+        } catch(e) {
+            out.textContent = '❌ 解析失败: ' + e.message + '\n\n说明这个文件不包含标准 EXIF 数据。';
+        }
+    };
+    reader.readAsDataURL(file);
+});
+</script>
+</body>
+</html>
