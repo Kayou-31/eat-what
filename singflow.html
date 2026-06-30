@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>电子签名工具</title>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        'primary-dark': '#4338CA',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* 自定义滚动条（隐藏） */
+        ::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+        }
+
+        /* 画布光标准确性 */
+        #signatureCanvas {
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        /* 按钮公共过渡 */
+        .btn-transition {
+            transition: all 0.2s ease;
+        }
+
+        /* 颜色选项选中高亮 */
+        .color-option.active {
+            outline: 3px solid #4F46E5;
+            outline-offset: 3px;
+            transform: scale(1.1);
+        }
+
+        /* 大小选项选中高亮 */
+        .size-option.active {
+            background-color: #4F46E5;
+            color: white;
+            border-color: #4F46E5;
+        }
+
+        /* 微小的抖动反馈 */
+        .btn-press:active {
+            transform: scale(0.94);
+        }
+
+        /* 预览签名 */
+        #previewArea canvas {
+            border-radius: 8px;
+            border: 1px dashed #d1d5db;
+        }
+
+        /* 签名面板阴影 */
+        .signature-panel {
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.04);
+        }
+
+        /* 响应式画布容器 */
+        .canvas-wrapper {
+            position: relative;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-indigo-50 min-h-screen font-sans antialiased">
+
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        <!-- 标题区域 -->
+        <header class="text-center mb-6 sm:mb-10">
+            <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">
+                ✍️ 电子签名
+            </h1>
+            <p class="mt-2 text-slate-500 text-sm sm:text-base">
+                在下方区域绘制您的签名，支持鼠标、触控笔或手指
+            </p>
+        </header>
+
+        <!-- 主卡片 -->
+        <div class="bg-white rounded-2xl signature-panel overflow-hidden border border-slate-200/60">
+            <!-- 工具栏 -->
+            <div class="px-4 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/40">
+                <div class="flex flex-wrap items-center gap-4 sm:gap-6">
+                    <!-- 左侧：颜色 + 大小 -->
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <!-- 笔触颜色 -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">颜色</span>
+                            <div class="flex gap-1.5" id="colorOptions">
+                                <button class="color-option w-7 h-7 rounded-full bg-black border-2 border-white shadow-sm btn-transition"
+                                data-color="#1E293B" title="深灰"></button>
+                                <button class="color-option w-7 h-7 rounded-full bg-blue-600 border-2 border-white shadow-sm btn-transition active"
+                                data-color="#2563EB" title="蓝色"></button>
+                                <button class="color-option w-7 h-7 rounded-full bg-red-500 border-2 border-white shadow-sm btn-transition"
+                                data-color="#EF4444" title="红色"></button>
+                                <button class="color-option w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow-sm btn-transition"
+                                data-color="#10B981" title="绿色"></button>
+                                <button class="color-option w-7 h-7 rounded-full bg-purple-500 border-2 border-white shadow-sm btn-transition"
+                                data-color="#8B5CF6" title="紫色"></button>
+                            </div>
+                        </div>
+
+                        <!-- 分隔线 -->
+                        <div class="hidden sm:block w-px h-8 bg-slate-200"></div>
+
+                        <!-- 笔触大小 -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-medium text-slate-500 uppercase tracking-wider">粗细</span>
+                            <div class="flex gap-1" id="sizeOptions">
+                                <button class="size-option px-3 py-1 text-xs rounded-md border border-slate-300 bg-white text-slate-600 btn-transition"
+                                data-size="2">细</button>
+                                <button class="size-option px-3 py-1 text-xs rounded-md border border-slate-300 bg-white text-slate-600 btn-transition active"
+                                data-size="4">中</button>
+                                <button class="size-option px-3 py-1 text-xs rounded-md border border-slate-300 bg-white text-slate-600 btn-transition"
+                                data-size="7">粗</button>
+                                <button class="size-option px-3 py-1 text-xs rounded-md border border-slate-300 bg-white text-slate-600 btn-transition"
+                                data-size="10">特粗</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右侧：操作按钮 -->
+                    <div class="flex items-center gap-2 ml-auto">
+                        <button id="undoBtn"
+                        class="btn-transition btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300 shadow-sm">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4" />
+                        </svg>
+                        撤销
+                    </button>
+                    <button id="clearBtn"
+                    class="btn-transition btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 bg-white text-red-500 hover:bg-red-50 hover:border-red-300 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    清空
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 画布区域 -->
+    <div class="px-4 sm:px-6 py-5 bg-white">
+        <div class="canvas-wrapper border border-slate-200 shadow-inner bg-white">
+            <canvas id="signatureCanvas" width="800" height="360"
+            class="block w-full h-auto touch-none"
+        style="min-height: 240px; background: #ffffff;">
+        您的浏览器不支持 Canvas，请使用现代浏览器。
+    </canvas>
+</div>
+
+<!-- 底部提示 -->
+<div class="mt-3 flex items-center justify-between text-xs text-slate-400">
+    <span>
+        <svg class="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        按住并拖动来签名
+    </span>
+    <span id="signatureSteps" class="font-mono text-slate-300">0 笔划</span>
+</div>
+</div>
+
+<!-- 底部操作栏：导出 + 预览 -->
+<div class="px-4 sm:px-6 py-4 border-t border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+    <!-- 预览区域 -->
+    <div class="flex items-center gap-3 flex-1 min-w-0">
+        <span class="text-xs font-medium text-slate-500 uppercase tracking-wider whitespace-nowrap">预览</span>
+        <div id="previewArea" class="flex-1 min-w-0 max-w-[160px] sm:max-w-[200px]">
+            <canvas id="previewCanvas" width="200" height="60"
+            class="w-full h-auto rounded-lg border border-dashed border-slate-200 bg-white"
+        style="min-height: 40px;"></canvas>
+    </div>
+</div>
+
+<!-- 导出按钮组 -->
+<div class="flex items-center gap-2 flex-shrink-0">
+    <button id="downloadPngBtn"
+    class="btn-transition btn-press inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary-dark shadow-md shadow-indigo-200/50">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+    导出 PNG
+</button>
+<button id="downloadJpgBtn"
+class="btn-transition btn-press inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm">
+导出 JPG
+</button>
+</div>
+</div>
+</div>
+
+<!-- 页脚 -->
+<footer class="mt-8 text-center text-xs text-slate-400">
+    绘制即表示您同意此签名具有法律效力 &mdash; 纯本地处理，不会上传任何数据
+</footer>
+</div>
+
+<script>
+    (function() {
+        'use strict';
+
+        // ---------- DOM refs ----------
+        const canvas = document.getElementById('signatureCanvas');
+        const ctx = canvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+        const colorOptions = document.querySelectorAll('.color-option');
+        const sizeOptions = document.querySelectorAll('.size-option');
+        const undoBtn = document.getElementById('undoBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const downloadPngBtn = document.getElementById('downloadPngBtn');
+        const downloadJpgBtn = document.getElementById('downloadJpgBtn');
+        const stepCounter = document.getElementById('signatureSteps');
+
+        // ---------- 状态 ----------
+        let isDrawing = false;
+        let lastX = 0,
+            lastY = 0;
+        let currentColor = '#2563EB';
+        let currentSize = 4;
+        let paths = []; // 存储所有笔划 { points, color, size }
+        let currentPath = null; // 当前正在绘制的笔划
+        let strokeCount = 0;
+
+        // ---------- 初始化画布 ----------
+        function initCanvas() {
+            // 设置实际像素尺寸（保持清晰）
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const displayWidth = rect.width || 800;
+            const displayHeight = rect.height || 360;
+            // 如果 canvas 尺寸还没设置，用默认
+            if (canvas.width === 800 && canvas.height === 360) {
+                // 使用 display 尺寸调整
+                resizeCanvas();
+            }
+            // 白色背景
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // 绘制所有已保存的路径
+            redrawAll();
+            updatePreview();
+        }
+
+        // ---------- 调整画布大小（响应式） ----------
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            const containerWidth = container.clientWidth;
+            // 保持比例 800:360 => 20:9
+            const height = Math.max(240, containerWidth * 360 / 800);
+            // 设置显示尺寸
+            canvas.style.width = containerWidth + 'px';
+            canvas.style.height = height + 'px';
+            // 设置实际像素 (2x 清晰)
+            const dpr = window.devicePixelRatio || 1;
+            const w = containerWidth * dpr;
+            const h = height * dpr;
+            if (canvas.width !== w || canvas.height !== h) {
+                // 保存当前路径数据
+                const oldPaths = paths;
+                const oldColor = currentColor;
+                const oldSize = currentSize;
+                canvas.width = w;
+                canvas.height = h;
+                // 缩放坐标需要重新映射？不，我们存储的是归一化坐标？为了简洁，存储原始坐标，但画布大小变了，坐标会偏移。
+                // 更好的方式：存储归一化坐标 (0-1)，或者干脆固定画布逻辑尺寸。为了简单，我们固定逻辑尺寸为 800x360，然后用 CSS 缩放。
+                // 重新采用固定逻辑尺寸方案：canvas.width/height 固定为 800/360，CSS 拉伸。
+                // 但为了高清，我们可以用 800*2 360*2 然后 CSS 缩小？太复杂。
+                // 最简单稳定：canvas.width=800, canvas.height=360, CSS 宽100% 自适应。这样所有坐标固定，不会乱。
+                // 重新设置：
+                canvas.width = 800;
+                canvas.height = 360;
+                canvas.style.width = '100%';
+                canvas.style.height = 'auto';
+                // 重新绘制
+                paths = oldPaths;
+                currentColor = oldColor;
+                currentSize = oldSize;
+                redrawAll();
+                updatePreview();
+            }
+        }
+
+        // 采用固定逻辑尺寸 800x360，CSS 自适应
+        // 强制设置
+        canvas.width = 800;
+        canvas.height = 360;
+        canvas.style.width = '100%';
+        canvas.style.height = 'auto';
+
+        // 填充白色背景
+        function fillBackground() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // 重绘所有路径
+        function redrawAll() {
+            fillBackground();
+            for (const path of paths) {
+                drawPath(path);
+            }
+            if (currentPath && currentPath.points.length > 0) {
+                drawPath(currentPath);
+            }
+            updateStepCounter();
+        }
+
+        // 绘制单条路径
+        function drawPath(path) {
+            if (!path || path.points.length < 2) return;
+            const pts = path.points;
+            ctx.save();
+            ctx.strokeStyle = path.color || '#1E293B';
+            ctx.lineWidth = path.size || 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) {
+                ctx.lineTo(pts[i].x, pts[i].y);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 更新笔划计数
+        function updateStepCounter() {
+            const count = paths.length + (currentPath && currentPath.points.length > 0 ? 1 : 0);
+            stepCounter.textContent = count + ' 笔划';
+        }
+
+        // ---------- 坐标获取 ----------
+        function getCanvasCoords(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            let clientX, clientY;
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+                e.preventDefault();
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        // ---------- 开始绘制 ----------
+        function startDrawing(e) {
+            e.preventDefault();
+            const coords = getCanvasCoords(e);
+            isDrawing = true;
+            lastX = coords.x;
+            lastY = coords.y;
+            currentPath = {
+                points: [{ x: coords.x, y: coords.y }],
+                color: currentColor,
+                size: currentSize
+            };
+            // 画一个点
+            ctx.save();
+            ctx.fillStyle = currentColor;
+            ctx.beginPath();
+            ctx.arc(coords.x, coords.y, currentSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+            updateStepCounter();
+        }
+
+        // ---------- 绘制中 ----------
+        function drawing(e) {
+            e.preventDefault();
+            if (!isDrawing || !currentPath) return;
+            const coords = getCanvasCoords(e);
+            const x = coords.x;
+            const y = coords.y;
+            // 画线
+            ctx.save();
+            ctx.strokeStyle = currentColor;
+            ctx.lineWidth = currentSize;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.restore();
+            // 记录点
+            currentPath.points.push({ x, y });
+            lastX = x;
+            lastY = y;
+            // 实时更新预览（节流）
+            updatePreview();
+        }
+
+        // ---------- 结束绘制 ----------
+        function stopDrawing(e) {
+            if (isDrawing && currentPath && currentPath.points.length > 0) {
+                paths.push(currentPath);
+                currentPath = null;
+                isDrawing = false;
+                updateStepCounter();
+                updatePreview();
+            } else {
+                isDrawing = false;
+                currentPath = null;
+            }
+        }
+
+        // ---------- 更新预览 ----------
+        function updatePreview() {
+            previewCanvas.width = 200;
+            previewCanvas.height = 60;
+            previewCtx.fillStyle = '#ffffff';
+            previewCtx.fillRect(0, 0, 200, 60);
+            // 缩小绘制所有路径
+            const scale = 200 / canvas.width;
+            previewCtx.save();
+            previewCtx.scale(scale, scale);
+            // 绘制所有已完成的路径
+            for (const path of paths) {
+                drawPathOnCtx(previewCtx, path);
+            }
+            // 绘制当前路径
+            if (currentPath && currentPath.points.length > 0) {
+                drawPathOnCtx(previewCtx, currentPath);
+            }
+            previewCtx.restore();
+        }
+
+        // 在指定 context 上绘制路径
+        function drawPathOnCtx(c, path) {
+            if (!path || path.points.length < 2) return;
+            const pts = path.points;
+            c.save();
+            c.strokeStyle = path.color || '#1E293B';
+            c.lineWidth = path.size || 4;
+            c.lineCap = 'round';
+            c.lineJoin = 'round';
+            c.beginPath();
+            c.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length; i++) {
+                c.lineTo(pts[i].x, pts[i].y);
+            }
+            c.stroke();
+            c.restore();
+        }
+
+        // ---------- 撤销 ----------
+        function undo() {
+            if (paths.length === 0) return;
+            paths.pop();
+            redrawAll();
+            updatePreview();
+        }
+
+        // ---------- 清空 ----------
+        function clearAll() {
+            paths = [];
+            currentPath = null;
+            isDrawing = false;
+            fillBackground();
+            updateStepCounter();
+            updatePreview();
+        }
+
+        // ---------- 导出 ----------
+        function exportImage(type = 'png') {
+            // 创建一个临时画布，去掉空白边缘？或者直接导出当前画布
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = canvas.width;
+            exportCanvas.height = canvas.height;
+            const expCtx = exportCanvas.getContext('2d');
+            expCtx.fillStyle = '#ffffff';
+            expCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            // 绘制所有路径（不包括当前未完成路径）
+            for (const path of paths) {
+                drawPathOnCtx(expCtx, path);
+            }
+            // 如果有当前路径，也绘制上去（可能未完成但用户想导出）
+            if (currentPath && currentPath.points.length > 0) {
+                drawPathOnCtx(expCtx, currentPath);
+            }
+
+            const mime = type === 'png' ? 'image/png' : 'image/jpeg';
+            const ext = type === 'png' ? 'png' : 'jpg';
+            const link = document.createElement('a');
+            link.download = `signature.${ext}`;
+            link.href = exportCanvas.toDataURL(mime, 0.95);
+            link.click();
+        }
+
+        // ---------- 事件绑定 ----------
+        // 鼠标事件
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', drawing);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        // 触摸事件
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', drawing, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing, { passive: false });
+        canvas.addEventListener('touchcancel', stopDrawing, { passive: false });
+
+        // 阻止右键菜单
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // 颜色选择
+        colorOptions.forEach(btn => {
+            btn.addEventListener('click', function() {
+                colorOptions.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentColor = this.dataset.color;
+            });
+        });
+
+        // 大小选择
+        sizeOptions.forEach(btn => {
+            btn.addEventListener('click', function() {
+                sizeOptions.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentSize = parseInt(this.dataset.size, 10);
+            });
+        });
+
+        // 撤销
+        undoBtn.addEventListener('click', undo);
+
+        // 清空
+        clearBtn.addEventListener('click', clearAll);
+
+        // 导出 PNG
+        downloadPngBtn.addEventListener('click', () => exportImage('png'));
+
+        // 导出 JPG
+        downloadJpgBtn.addEventListener('click', () => exportImage('jpg'));
+
+        // ---------- 窗口自适应 ----------
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                // 由于我们固定逻辑尺寸，只需要确保 CSS 尺寸正确，画布内容不受影响
+                // 但预览画布可能需要更新
+                updatePreview();
+            }, 200);
+        });
+
+        // ---------- 初始化 ----------
+        fillBackground();
+        updateStepCounter();
+        updatePreview();
+
+        // 设置默认激活颜色和大小
+        document.querySelector('.color-option[data-color="#2563EB"]')?.classList.add('active');
+        document.querySelector('.size-option[data-size="4"]')?.classList.add('active');
+
+        // 额外：防止页面滚动
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.target === canvas) e.preventDefault();
+        }, { passive: false });
+
+    })();
+</script>
+
+</body>
+</html>
