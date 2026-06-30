@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>多语言翻译 · 自动识别转中文</title>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        /* 自定义滚动条 */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #c7d2fe;
+            border-radius: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: #a5b4fc;
+        }
+
+        /* 输入框焦点光晕 */
+        .input-glow:focus-within {
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+            border-color: #8b5cf6;
+        }
+
+        /* 卡片悬浮 */
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 40px rgba(139, 92, 246, 0.08);
+        }
+
+        /* 语言标签 */
+        .lang-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 14px;
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            transition: all 0.2s;
+        }
+        .lang-tag-en {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .lang-tag-ja {
+            background: #fce7f3;
+            color: #be185d;
+        }
+        .lang-tag-ko {
+            background: #d1fae5;
+            color: #047857;
+        }
+        .lang-tag-zh {
+            background: #fef3c7;
+            color: #b45309;
+        }
+        .lang-tag-fr {
+            background: #e0e7ff;
+            color: #4338ca;
+        }
+        .lang-tag-de {
+            background: #fef9c3;
+            color: #a16207;
+        }
+        .lang-tag-es {
+            background: #fce7f3;
+            color: #be123c;
+        }
+        .lang-tag-ru {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .lang-tag-other {
+            background: #f3f4f6;
+            color: #4b5563;
+        }
+
+        /* 加载波纹 */
+        .loading-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #8b5cf6;
+            animation: dotPulse 1.2s ease-in-out infinite;
+        }
+        .loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes dotPulse {
+            0%,
+            80%,
+            100% {
+                transform: scale(0.6);
+                opacity: 0.4;
+            }
+            40% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* 翻译结果淡入 */
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 示例按钮 */
+        .example-btn {
+            transition: all 0.2s;
+            background: white;
+        }
+        .example-btn:hover {
+            background: #f5f3ff;
+            border-color: #a78bfa;
+            color: #7c3aed;
+            transform: scale(1.02);
+        }
+
+        /* 清除按钮 */
+        .clear-btn {
+            transition: all 0.2s;
+        }
+        .clear-btn:hover {
+            background: #fee2e2;
+            color: #dc2626;
+            border-color: #fca5a5;
+        }
+
+        @media (max-width: 640px) {
+            .pinyin-output {
+                font-size: 1rem;
+                line-height: 2.2;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-purple-50/30 to-indigo-50/30 min-h-screen font-sans antialiased">
+
+    <!-- ===== 顶部 ===== -->
+    <header class="pt-10 pb-6 px-4 text-center">
+        <h1 class="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-500 to-indigo-600 bg-clip-text text-transparent tracking-tight drop-shadow-sm">
+            🌐 多语言翻译
+        </h1>
+        <p class="mt-3 text-slate-500 text-base md:text-lg max-w-xl mx-auto">
+            自动识别 · 转中文 &nbsp;|&nbsp; 支持英、日、韩、法、德等
+        </p>
+        <div class="mt-3 flex items-center justify-center gap-2 text-xs text-slate-400">
+            <span class="inline-flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-purple-400"></span> 智能检测
+            </span>
+            <span class="text-slate-300">·</span>
+            <span class="inline-flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-pink-400"></span> 即时翻译
+            </span>
+            <span class="text-slate-300">·</span>
+            <span class="inline-flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-indigo-400"></span> 一键清除
+            </span>
+        </div>
+    </header>
+
+    <!-- ===== 主卡片 ===== -->
+    <main class="max-w-3xl mx-auto px-4 pb-20">
+        <section class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg shadow-purple-100/40 border border-purple-100/60 p-6 md:p-8 card-hover transition-all">
+
+            <!-- 标题区 -->
+            <div class="flex items-center gap-3 mb-5">
+                <span class="flex items-center justify-center w-11 h-11 rounded-xl bg-purple-100 text-purple-600 text-2xl shadow-sm">🔄</span>
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">翻译到中文</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">自动识别源语言 · 实时翻译</p>
+                </div>
+            </div>
+
+            <!-- 输入区 -->
+            <div class="input-glow border border-slate-200 rounded-xl overflow-hidden transition-all bg-white">
+                <textarea id="translateInput"
+                placeholder="粘贴或输入英文、日文、韩文、法文…"
+                rows="4"
+                class="w-full resize-none border-0 outline-none p-4 text-slate-700 placeholder:text-slate-300 text-base leading-relaxed custom-scroll transition-colors focus:bg-purple-50/10"
+            ></textarea>
+        </div>
+
+        <!-- 状态栏：语言标签 + 操作 -->
+        <div class="mt-3 flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
+                <!-- 语言标签容器 -->
+                <div id="langTagContainer" class="flex items-center gap-2">
+                    <span class="lang-tag lang-tag-other text-xs">未检测</span>
+                </div>
+                <!-- 翻译状态 -->
+                <div id="translateStatus" class="flex items-center gap-1.5 text-xs text-slate-400">
+                    <span>等待输入…</span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button id="clearTranslateBtn"
+                class="clear-btn text-xs px-3 py-1.5 rounded-full border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all"
+            >
+                ✕ 清空
+            </button>
+            <span class="text-xs text-purple-300 hidden sm:inline self-center">按 ESC 清空</span>
+        </div>
+    </div>
+
+    <!-- 翻译结果 -->
+    <div class="mt-4 bg-gradient-to-br from-purple-50/50 to-indigo-50/30 border border-purple-100/50 rounded-xl p-5 min-h-[100px] max-h-[280px] overflow-y-auto custom-scroll transition-all">
+        <div id="translateOutput"
+        class="text-slate-700 text-base leading-relaxed break-words select-text"
+    >
+        <span class="text-slate-300 text-sm">翻译结果将显示在这里</span>
+    </div>
+</div>
+
+<!-- 快捷示例 -->
+<div class="mt-5 flex flex-wrap items-center gap-2.5">
+    <span class="text-xs text-slate-400 font-medium mr-1">试试例子：</span>
+    <button class="example-btn text-xs px-3.5 py-1.5 rounded-full border border-purple-200 text-purple-500 bg-purple-50/30 shadow-sm" data-example="Hello, welcome to the world of language translation!">
+        🇬🇧 English
+    </button>
+    <button class="example-btn text-xs px-3.5 py-1.5 rounded-full border border-pink-200 text-pink-500 bg-pink-50/30 shadow-sm" data-example="こんにちは、今日はいい天気ですね。">
+        🇯🇵 日本語
+    </button>
+    <button class="example-btn text-xs px-3.5 py-1.5 rounded-full border border-emerald-200 text-emerald-500 bg-emerald-50/30 shadow-sm" data-example="안녕하세요, 반갑습니다! 오늘 날씨가 좋네요.">
+        🇰🇷 한국어
+    </button>
+    <button class="example-btn text-xs px-3.5 py-1.5 rounded-full border border-blue-200 text-blue-500 bg-blue-50/30 shadow-sm" data-example="Bonjour, comment allez-vous ? J'espère que vous passez une bonne journée.">
+        🇫🇷 Français
+    </button>
+    <button class="example-btn text-xs px-3.5 py-1.5 rounded-full border border-amber-200 text-amber-500 bg-amber-50/30 shadow-sm" data-example="Guten Tag, wie geht es Ihnen?">
+        🇩🇪 Deutsch
+    </button>
+</div>
+
+<!-- 底部信息 -->
+<div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+    <span>🔍 自动检测语言 · 翻译引擎 MyMemory</span>
+    <span class="text-purple-300">✦ 粘贴即响应</span>
+</div>
+</section>
+</main>
+
+<!-- ===== 底部装饰 ===== -->
+<footer class="pb-6 text-center text-xs text-slate-400">
+    <span class="inline-flex items-center gap-2">
+        <span class="w-1.5 h-1.5 rounded-full bg-purple-300"></span>
+        支持英 / 日 / 韩 / 法 / 德 / 西 / 俄等
+        <span class="w-1.5 h-1.5 rounded-full bg-pink-300"></span>
+    </span>
+</footer>
+
+<!-- ============================================================ -->
+<!-- JavaScript -->
+<!-- ============================================================ -->
+<script>
+    (function() {
+        'use strict';
+
+        // ---------- DOM ----------
+        const translateInput = document.getElementById('translateInput');
+        const translateOutput = document.getElementById('translateOutput');
+        const translateStatus = document.getElementById('translateStatus');
+        const langTagContainer = document.getElementById('langTagContainer');
+        const clearTranslateBtn = document.getElementById('clearTranslateBtn');
+        const exampleBtns = document.querySelectorAll('.example-btn');
+
+        // ---------- 语言名称映射 (用于显示) ----------
+        const LANG_NAME = {
+            'en': 'English',
+            'ja': '日本語',
+            'ko': '한국어',
+            'zh': '中文',
+            'zh-CN': '中文',
+            'fr': 'Français',
+            'de': 'Deutsch',
+            'es': 'Español',
+            'ru': 'Русский',
+            'it': 'Italiano',
+            'pt': 'Português',
+            'nl': 'Nederlands',
+            'ar': 'العربية',
+            'hi': 'हिन्दी',
+            'th': 'ไทย',
+            'vi': 'Tiếng Việt',
+        };
+        const LANG_TAG_CLASS = {
+            'en': 'lang-tag-en',
+            'ja': 'lang-tag-ja',
+            'ko': 'lang-tag-ko',
+            'zh': 'lang-tag-zh',
+            'zh-CN': 'lang-tag-zh',
+            'fr': 'lang-tag-fr',
+            'de': 'lang-tag-de',
+            'es': 'lang-tag-es',
+            'ru': 'lang-tag-ru',
+            'other': 'lang-tag-other',
+        };
+
+        // ---------- 语言检测 (基于Unicode) ----------
+        function detectLanguage(text) {
+            if (!text.trim()) return null;
+
+            // 去掉空格和常见符号
+            const clean = text.replace(/[\s\n\r，。；！？、·""''「」『』【】《》—…·,\.;:!?\(\)\-]/g, '');
+
+            // 统计各语种字符数量
+            let jaCount = 0,
+                koCount = 0,
+                zhCount = 0,
+                enCount = 0,
+                otherCount = 0;
+
+            for (const char of clean) {
+                const code = char.charCodeAt(0);
+                // 韩文 (AC00-D7AF, 1100-11FF, 3130-318F)
+                if ((code >= 0xAC00 && code <= 0xD7AF) ||
+                    (code >= 0x1100 && code <= 0x11FF) ||
+                    (code >= 0x3130 && code <= 0x318F) ||
+                    (code >= 0xA960 && code <= 0xA97C) ||
+                    (code >= 0xD7B0 && code <= 0xD7FF)) {
+                    koCount++;
+                }
+                // 日文 (平假名、片假名)
+                else if ((code >= 0x3040 && code <= 0x309F) ||
+                    (code >= 0x30A0 && code <= 0x30FF) ||
+                    (code >= 0x4E00 && code <= 0x9FFF && code !== 0x3007)) {
+                    // 汉字在日文中也出现，但通过平假名片假名优先检测日语
+                    // 如果同时有平假名片假名，算日语；如果只有汉字，可能中文或日文，我们通过前后文辅助
+                    // 简单策略：先检测到平假名片假名则算日语
+                    const isHiragana = (code >= 0x3040 && code <= 0x309F);
+                    const isKatakana = (code >= 0x30A0 && code <= 0x30FF);
+                    if (isHiragana || isKatakana) {
+                        jaCount++;
+                    } else {
+                        // 汉字 (CJK统一表意文字)
+                        zhCount++;
+                    }
+                }
+                // 中文 (CJK统一表意文字 + 中文标点)
+                else if (char >= '\u4e00' && char <= '\u9fff') {
+                    zhCount++;
+                }
+                // 英文 (基本拉丁字母)
+                else if ((code >= 0x41 && code <= 0x5A) || (code >= 0x61 && code <= 0x7A)) {
+                    enCount++;
+                } else {
+                    otherCount++;
+                }
+            }
+
+            // 判断逻辑：如果一个字符都没有，返回空
+            const total = jaCount + koCount + zhCount + enCount + otherCount;
+            if (total === 0) return null;
+
+            // 优先判断：如果有平假名/片假名 => 日语
+            if (jaCount > 0) return 'ja';
+            // 如果有韩文字母 => 韩语
+            if (koCount > 0) return 'ko';
+            // 如果英文字母占多数且中文稀少 => 英语
+            if (enCount > zhCount && enCount > 0) return 'en';
+            // 如果有汉字且英文少 => 中文
+            if (zhCount > enCount && zhCount > 0) return 'zh';
+            // 如果其他字符多（如法语、德语等的拉丁字母+重音） => 尝试识别为en或fr等，但统一用'en'作为默认
+            // 但我们可以通过一些特殊字母判断：如法语 é, è, ê, ç 等，德语 ä, ö, ü, ß 等
+            // 简单处理：如果出现常见法语字符，标记为fr
+            const frenchChars = ['é', 'è', 'ê', 'ë', 'à', 'â', 'ä', 'ù', 'û', 'ü', 'ô', 'ö', 'î', 'ï', 'ç'];
+            const germanChars = ['ä', 'ö', 'ü', 'ß'];
+            const spanishChars = ['ñ', 'ü', 'é', 'í', 'ó', 'ú'];
+            let hasFrench = false,
+                hasGerman = false,
+                hasSpanish = false;
+            for (const ch of clean) {
+                if (frenchChars.includes(ch)) hasFrench = true;
+                if (germanChars.includes(ch)) hasGerman = true;
+                if (spanishChars.includes(ch)) hasSpanish = true;
+            }
+            if (hasFrench) return 'fr';
+            if (hasGerman) return 'de';
+            if (hasSpanish) return 'es';
+
+            // 如果只有其他字符（数字、符号）或无法判断，返回英文作为默认
+            if (enCount === 0 && zhCount === 0 && jaCount === 0 && koCount === 0) {
+                // 可能是符号或数字，默认英文
+                return 'en';
+            }
+
+            // 最后fallback: 如果英文与中文混合，但英文稍多，还是英文
+            if (enCount > 0) return 'en';
+            if (zhCount > 0) return 'zh';
+            return 'en';
+        }
+
+        // ---------- 更新语言标签 ----------
+        function updateLangTag(langCode) {
+            if (!langCode) {
+                langTagContainer.innerHTML = `<span class="lang-tag lang-tag-other text-xs">未检测</span>`;
+                return;
+            }
+            const name = LANG_NAME[langCode] || langCode.toUpperCase();
+            const cls = LANG_TAG_CLASS[langCode] || 'lang-tag-other';
+            langTagContainer.innerHTML = `<span class="lang-tag ${cls} text-xs">${name}</span>`;
+        }
+
+        // ---------- 状态显示 ----------
+        function setStatus(html, isError = false) {
+            translateStatus.innerHTML = html;
+            if (isError) {
+                translateStatus.classList.add('text-red-400');
+            } else {
+                translateStatus.classList.remove('text-red-400');
+            }
+        }
+
+        // ---------- 翻译函数 ----------
+        let isTranslating = false;
+        let translateTimer = null;
+
+        function doTranslate(text) {
+            // 清除之前的定时器
+            if (translateTimer) {
+                clearTimeout(translateTimer);
+                translateTimer = null;
+            }
+
+            // 空输入
+            if (!text.trim()) {
+                translateOutput.innerHTML = '<span class="text-slate-300 text-sm">翻译结果将显示在这里</span>';
+                setStatus('<span>等待输入…</span>');
+                updateLangTag(null);
+                return;
+            }
+
+            // 防抖 400ms
+            translateTimer = setTimeout(() => {
+                translateTimer = null;
+                if (isTranslating) return;
+
+                // 检测语言
+                const detectedLang = detectLanguage(text);
+                updateLangTag(detectedLang);
+
+                // 如果是中文，提示无需翻译
+                if (detectedLang === 'zh') {
+                    translateOutput.innerHTML =
+                        `<span class="text-amber-600">📌 输入内容为中文，无需翻译。</span>`;
+                    setStatus(`<span class="text-amber-400">⚠️ 源语言是中文</span>`);
+                    return;
+                }
+
+                // 准备翻译参数：MyMemory API 要求源语言代码，不能使用auto
+                // 我们使用检测到的语言代码，如果检测不到则默认'en'
+                const sourceLang = detectedLang || 'en';
+                // 设置目标语言为中文简化字：zh-CN
+                const langpair = `${sourceLang}|zh-CN`;
+
+                isTranslating = true;
+                setStatus(`
+                            <span class="loading-dot"></span>
+                            <span class="loading-dot"></span>
+                            <span class="loading-dot"></span>
+                            <span class="ml-1">翻译中…</span>
+                        `);
+                translateOutput.innerHTML = '<span class="text-slate-400 text-sm">⏳ 正在翻译…</span>';
+
+                const url =
+                    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langpair}`;
+
+                fetch(url, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json' },
+                    })
+                    .then(res => {
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        return res.json();
+                    })
+                    .then(data => {
+                        isTranslating = false;
+                        if (data && data.responseData) {
+                            const translated = data.responseData.translatedText || '';
+                            // 注意：MyMemory 可能返回的文本包含 &quot; 等实体，需要转义
+                            const decoded = decodeHtmlEntities(translated);
+
+                            if (translated) {
+                                translateOutput.innerHTML =
+                                    `<span class="fade-in text-slate-800">${escapeHtml(decoded)}</span>`;
+                                // 显示检测到的语言
+                                const langName = LANG_NAME[detectedLang] || detectedLang.toUpperCase();
+                                setStatus(`<span class="text-emerald-500">✓ 已翻译 · 源语言: ${langName}</span>`);
+                            } else {
+                                translateOutput.innerHTML =
+                                    `<span class="text-slate-400 text-sm">⚠️ 翻译结果为空</span>`;
+                                setStatus(`<span class="text-amber-400">结果为空</span>`);
+                            }
+                        } else {
+                            throw new Error('API返回格式异常');
+                        }
+                    })
+                    .catch(err => {
+                        isTranslating = false;
+                        console.error('翻译错误:', err);
+                        translateOutput.innerHTML =
+                            `<span class="text-red-400 text-sm">❌ 翻译失败: ${err.message || '网络错误'}</span>`;
+                        setStatus(`<span class="text-red-400">请求失败，请检查网络或重试</span>`, true);
+                    });
+            }, 400);
+        }
+
+        // ---------- 辅助函数 ----------
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function decodeHtmlEntities(str) {
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = str;
+            return textarea.value;
+        }
+
+        // ---------- 清空输入 ----------
+        function clearInput() {
+            translateInput.value = '';
+            doTranslate('');
+            translateInput.focus();
+        }
+
+        // ---------- 设置示例 ----------
+        function setExample(text) {
+            translateInput.value = text;
+            doTranslate(text);
+            // 滚动到输出
+            setTimeout(() => {
+                translateOutput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+        }
+
+        // ---------- 事件绑定 ----------
+        translateInput.addEventListener('input', function() {
+            doTranslate(this.value);
+        });
+
+        translateInput.addEventListener('paste', function() {
+            requestAnimationFrame(() => {
+                doTranslate(this.value);
+            });
+        });
+
+        translateInput.addEventListener('cut', function() {
+            setTimeout(() => doTranslate(translateInput.value), 10);
+        });
+
+        clearTranslateBtn.addEventListener('click', clearInput);
+
+        // ESC 清空
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.activeElement === translateInput) {
+                e.preventDefault();
+                clearInput();
+            }
+        });
+
+        // 示例按钮
+        exampleBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const text = this.dataset.example;
+                if (text) setExample(text);
+            });
+        });
+
+        // ---------- 初始化 ----------
+        doTranslate('');
+
+        console.log('🌐 多语言翻译工具已启动');
+        console.log('💡 支持英文、日文、韩文、法文、德文等 -> 中文');
+        console.log('按 ESC 清空当前输入');
+    })();
+</script>
+
+</body>
+</html>
